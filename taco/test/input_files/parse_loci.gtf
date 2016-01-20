@@ -1,0 +1,11 @@
+chrTest1	test	transcript	11	50	0	+	.	transcript_id "A"
+chrTest1	test	exon	11	50	0	+	.	transcript_id "A"
+
+chrTest1	test	transcript	51	100	0	+	.	transcript_id "B"
+chrTest1	test	exon	51	100	0	+	.	transcript_id "B"
+
+chrTest1	test	transcript	100	200	0	+	.	transcript_id "C"
+chrTest1	test	exon	100	200	0	+	.	transcript_id "C"
+
+chrTest2	test	transcript	101	200	0	+	.	transcript_id "D"
+chrTest2	test	exon	101	200	0	+	.	transcript_id "D"
