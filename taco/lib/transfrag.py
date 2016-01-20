@@ -62,7 +62,7 @@ class Transfrag(object):
                          exons=None)
 
     @staticmethod
-    def parse_gtf(gtf_lines, ignore_ref=True):
+    def parse_gtf(gtf_lines):
         '''
         returns list of Transfrag objects
         '''
@@ -70,11 +70,6 @@ class Transfrag(object):
         for gtf_line in gtf_lines:
             f = GTF.Feature.from_str(gtf_line)
             t_id = f.attrs[GTF.Attr.TRANSCRIPT_ID]
-            is_ref = bool(int(f.attrs.get(GTF.Attr.REF, '0')))
-
-            if is_ref and ignore_ref:
-                continue
-
             if f.feature == 'transcript':
                 if t_id in t_dict:
                     raise GTFError("Transcript '%s' duplicate detected" % t_id)

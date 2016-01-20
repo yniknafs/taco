@@ -32,15 +32,6 @@ def main():
     else:
         logging.info(msg)
         R.aggregate()
-    # impute unstranded transfrags
-    msg = 'Imputing unstranded transfrags'
-    if R.status.impute_strand:
-        logging.info('[SKIPPING] %s' % msg)
-    else:
-        logging.info(msg)
-        R.impute_strand()
-
-    return
     # assemble
     msg = 'Assembling GTF files'
     if R.status.assemble:

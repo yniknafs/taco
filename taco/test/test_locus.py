@@ -1,22 +1,13 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
-import os
-import logging
+import pytest
+import numpy as np
 
-from taco.lib.gtf import GTF
+from taco.lib.base import Strand, TacoError
 from taco.lib.transfrag import Transfrag
 from taco.lib.assemble import find_boundaries, split_transfrag, Locus
-
-INPUT_FILE_DIR = "input_files"
-
-
-def get_gtf_path(filename):
-    return os.path.join(os.path.dirname(__file__), INPUT_FILE_DIR, filename)
-
-
-def read_gtf(filename):
-    return list(GTF.parse_loci(open(get_gtf_path(filename))))
+from taco.test.base import read_gtf
 
 
 def test_parse_loci():
@@ -62,4 +53,14 @@ def test_create_locus():
     interval, gtf_lines = loci[0]
     t_dict = Transfrag.parse_gtf(gtf_lines)
     locus = Locus.create(t_dict.values())
-    # logging.error()
+    assert tuple(locus.boundaries) == (10, 100, 200, 250, 300, 400, 525)
+    a = locus.get_expr_data(49, 51, Strand.POS)
+    assert np.array_equal(a, [1.0, 2.0])
+    a = locus.get_expr_data(150, 151, Strand.POS)
+    assert np.array_equal(a, [1.0])
+    a = locus.get_expr_data(499, 501, Strand.POS)
+    assert np.array_equal(a, [3.0, 1.0])
+    with pytest.raises(TacoError):
+        locus.get_expr_data(5, 15, Strand.POS)
+    with pytest.raises(TacoError):
+        locus.get_expr_data(520, 530, Strand.POS)

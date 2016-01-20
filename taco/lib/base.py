@@ -29,9 +29,13 @@ class Strand:
     POS = 0
     NEG = 1
     NA = 2
-
+    NAMES = ['pos', 'neg', 'none']
     FROM_GTF = {'+': POS, '-': NEG, '.': NA}
     TO_GTF = {POS: '+', NEG: '-', NA: '.'}
+
+    @staticmethod
+    def to_str(s):
+        return Strand.NAMES[s]
 
     @staticmethod
     def from_gtf(s):

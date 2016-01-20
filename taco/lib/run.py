@@ -13,7 +13,7 @@ import json
 
 from base import Sample
 from aggregate import aggregate
-from assemble import impute_strand
+from assemble import assemble
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2015"
@@ -201,7 +201,7 @@ class Results(object):
 
 
 class Status(object):
-    FIELDS = ('create', 'aggregate', 'impute_strand', 'assemble')
+    FIELDS = ('create', 'aggregate', 'assemble')
 
     def __init__(self):
         for f in Status.FIELDS:
@@ -289,6 +289,9 @@ class Run(object):
         self.status.aggregate = True
         self.status.write(self.results.status_file)
 
-    def impute_strand(self):
-        a = self.args
-        r = self.results
+    def assemble(self):
+        assemble(gtf_file=self.results.transfrags_gtf_file,
+                 output_dir=self.args.output_dir)
+        # update status and write to file
+        # self.status.assemble = True
+        # self.status.write(self.results.status_file)

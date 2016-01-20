@@ -1,7 +1,7 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
-import collections
+import os
 import bisect
 import logging
 import networkx as nx
@@ -9,13 +9,14 @@ import numpy as np
 
 from gtf import GTF
 from base import Strand, TacoError
+from bedgraph import array_to_bedgraph
 from transfrag import Transfrag
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "1.0.1"
+__version__ = "0.4.0"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -91,68 +92,53 @@ class Locus(object):
                 logging.error('Locus.create: "chrom" mismatch')
                 raise TacoError('Locus.create: transfrag chromosomes do '
                                 'not match')
-            self._add_transfrag(t)
             self.strand_transfrags[t.strand].append(t)
+            self._add_transfrag(t)
         return self
 
     def _add_transfrag(self, t):
-        for n in split_transfrag(t, self.boundaries):
-            start = n[0] - self.boundaries[0]
-            end = n[1] - self.boundaries[0]
-            if t.is_ref:
-                # TODO: add starts/stops
-                pass
-            else:
-                self.expr_data[t.strand, start:end] += t.expr
+        if t.is_ref:
+            # TODO: handle ref transcripts
+            return
+        for exon in t.exons:
+            start = exon.start - self.boundaries[0]
+            end = exon.end - self.boundaries[0]
+            self.expr_data[t.strand, start:end] += t.expr
             self.strand_data[t.strand, start:end] = True
-            print 't %s node %s' % (t._id, str(n))
-        print 'expr strand %s %s' % (Strand.to_gtf(t.strand), ','.join(map(str, self.expr_data[t.strand])))
 
-    def _remove_transfrag(self, t):
-        for n in split_transfrag(t, self.boundaries):
-            start = n[0] - self.boundaries[0]
-            end = n[1] - self.boundaries[0]
-
-            self.strand_data[t.strand]
-
-            nd = self.node_data[n]
-            nd.strands[t.strand] = False
-            nd.samples[t.strand].remove(t.sample_id)
-            nd.exprs[t.strand] -= t.expr
-
-    def _check_strand_ambiguous(self, nodes):
+    def _check_strand_ambiguous(self, t):
         '''
         Checks list of nodes for strandedness. If strand is unambiguous,
         then return pos or neg strand. If ambiguous, return unstranded.
         '''
-        strands = {GTF.POS_STRAND: False,
-                   GTF.NEG_STRAND: False}
-        for n in nodes:
-            nd = self.node_data[n]
-            if nd.strands['+'] or nd.exprs['+'] > 0:
-                strands['+'] = True
-            if nd.strands['-'] or nd.exprs['-'] > 0:
-                strands['-'] = True
-        if strands['+'] and strands['-']:
-            return '.'
-        elif strands['+']:
-            return '+'
-        elif strands['-']:
-            return '-'
-        return '.'
+        strands = [False, False]
+        for exon in t.exons:
+            start = exon.start - self.boundaries[0]
+            end = exon.end - self.boundaries[0]
+            for s in (Strand.POS, Strand.NEG):
+                if self.strand_data[s, start:end].any():
+                    strands[s] = True
+                if self.expr_data[s, start:end].sum() > 0:
+                    strands[s] = True
+        if strands[Strand.POS] and strands[Strand.NEG]:
+            return Strand.NA
+        elif strands[Strand.POS]:
+            return Strand.POS
+        elif strands[Strand.NEG]:
+            return Strand.NEG
+        return Strand.NA
 
     def impute_unknown_strands(self):
         # iteratively predict strand of unstranded transfrags
         # stop when no new transfrag strands can be imputed
         iterations = 0
         num_resolved = 0
-        while(len(self.strand_transfrags['.']) > 0):
+        while(len(self.strand_transfrags[Strand.NA]) > 0):
             resolved = []
             unresolved = []
-            for t in self.strand_transfrags['.']:
-                nodes = list(split_exons(t, self.boundaries))
-                new_strand = self._check_strand_ambiguous(nodes)
-                if new_strand != '.':
+            for t in self.strand_transfrags[Strand.NA]:
+                new_strand = self._check_strand_ambiguous(t)
+                if new_strand != Strand.NA:
                     resolved.append((t, new_strand))
                     num_resolved += 1
                 else:
@@ -160,20 +146,32 @@ class Locus(object):
             # break when no new transfrags could have strand predicted
             if len(resolved) == 0:
                 break
-            # clear Locus data for transfrags with unknown strand and re-add
-            # them to the Locus
+            # add resolved transfrags to new strand
             for t, new_strand in resolved:
-                self._remove_transfrag(t)
                 t.strand = new_strand
                 self._add_transfrag(t)
                 self.strand_transfrags[t.strand].append(t)
-            self.strand_transfrags['.'] = unresolved
+            self.strand_transfrags[Strand.NA] = unresolved
             iterations += 1
+
+        # clear unstranded data and re-add unresolved transcripts
+        if num_resolved > 0:
+            self.strand_data[Strand.NA, :] = False
+            self.expr_data[Strand.NA, :] = 0.0
+            for t in self.strand_transfrags[Strand.NA]:
+                self._add_transfrag(t)
 
         if iterations > 0:
             logging.debug('predict_unknown_strands: %d iterations' %
                           iterations)
         return num_resolved
+
+    def get_expr_data(self, start, end, strand):
+        if ((start < self.boundaries[0]) or (end > self.boundaries[-1])):
+            raise TacoError('start/end are out of bounds')
+        start = start - self.boundaries[0]
+        end = end - self.boundaries[0]
+        return self.expr_data[strand, start:end]
 
     def create_directed_graph(self, strand):
         '''
@@ -188,14 +186,14 @@ class Locus(object):
 
         # initialize transcript graph
         transfrags = self.strand_transfrags[strand]
-        boundaries = find_exon_boundaries(transfrags)
+        boundaries = find_boundaries(transfrags)
         G = nx.DiGraph()
 
         # add transcripts
         for t in transfrags:
             # split exons that cross boundaries and get the
             # nodes that made up the transfrag
-            nodes = [n for n in split_exons(t, boundaries)]
+            nodes = [n for n in split_transfrag(t, boundaries)]
             if strand == '-':
                 nodes.reverse()
             # add nodes/edges to graph
@@ -223,92 +221,73 @@ class Locus(object):
             Gsubs = nx.weakly_connected_component_subgraphs(H)
 
     @staticmethod
-    def open_bedgraph(file_prefix):
-        attrs = ('expression', 'recurrence')
-        strand_names = {'+': 'pos', '-': 'neg', '.': 'none'}
-        filehs = {}
-        for a in attrs:
-            filehs[a] = {}
-            for s in ('+', '-', '.'):
-                filename = '%s.%s.%s.bedgraph' % (file_prefix, a,
-                                                  strand_names[s])
-                filehs[a][s] = open(filename, 'w')
-        return filehs
+    def open_bedgraphs(file_prefix):
+        bgfilehs = []
+        for s in [Strand.POS, Strand.NEG, Strand.NA]:
+            filename = '%s.%s.bedgraph' % (file_prefix, Strand.NAMES[s])
+            bgfilehs.append(open(filename, 'w'))
+        return bgfilehs
 
     @staticmethod
-    def close_bedgraph(filehs):
-        for adict in filehs.itervalues():
-            for fileh in adict.itervalues():
-                fileh.close()
+    def close_bedgraphs(bgfilehs):
+        for fileh in bgfilehs:
+            fileh.close()
 
     def get_bedgraph_data(self):
         '''
-        Returns node attribute data in tuples
-            chrom, start, end, strand, total expression, sample recurrence
+        Returns data in tuples
+            chrom, start, end, strand, expression
         '''
-        for n in sorted(self.node_data):
-            nd = self.node_data[n]
-            for strand in ('+', '-', '.'):
-                yield (self.chrom, n[0], n[1], strand,
-                       nd.exprs[strand], len(nd.samples[strand]))
+        for strand in (Strand.POS, Strand.NEG, Strand.NA):
+            for start, end, expr in array_to_bedgraph(self.expr_data[strand]):
+                yield (self.chrom, start + self.boundaries[0],
+                       end + self.boundaries[0], strand, expr)
 
-    def write_bedgraph(self, bgfiledict):
+    def write_bedgraph(self, bgfilehs):
         '''
         bgfiledict: dictionary structure containing file handles opened
                     for writing obtained using Locus.open_bedgraph()
         '''
         for tup in self.get_bedgraph_data():
-            chrom, start, end, strand, expr, recur = tup
+            chrom, start, end, strand, expr = tup
             if expr > 0:
                 line = '\t'.join(map(str, [chrom, start, end, expr]))
-                print >>bgfiledict['expression'][strand], line
-            if recur > 0:
-                line = '\t'.join(map(str, [chrom, start, end, recur]))
-                print >>bgfiledict['recurrence'][strand], line
+                print >>bgfilehs[strand], line
 
 
-def impute_strand(a, r):
+def assemble(gtf_file, output_dir):
     # setup bedgraph output files
-    # file_prefix = os.path.join(a.output_dir, 'loci.unresolved')
-    # raw_bgfilehd = Locus.open_bedgraph(file_prefix)
-    # file_prefix = os.path.join(a.output_dir, 'loci.resolved')
-    # resolved_bgfilehd = Locus.open_bedgraph(file_prefix)
-    import sys
+    file_prefix = os.path.join(output_dir, 'loci.unresolved')
+    raw_bgfilehd = Locus.open_bedgraphs(file_prefix)
+    file_prefix = os.path.join(output_dir, 'loci.resolved')
+    resolved_bgfilehd = Locus.open_bedgraphs(file_prefix)
 
     # parse gtf file
-    ignore_ref = not a.guided
-    for interval, gtf_lines in GTF.parse_loci(open(r.transfrags_gtf_file)):
+    for interval, gtf_lines in GTF.parse_loci(open(gtf_file)):
         chrom, start, end = interval
-        t_dict = Transfrag.parse_gtf(gtf_lines, ignore_ref)
+        print chrom, start, end, len(gtf_lines)
+        t_dict = Transfrag.parse_gtf(gtf_lines)
         locus = Locus.create(t_dict.values())
         logging.debug('Locus %s:%d-%d: '
                       '%d transfrags (+: %d, -: %d, .: %d)' %
                       (chrom, start, end, len(t_dict),
-                       len(locus.strand_transfrags['+']),
-                       len(locus.strand_transfrags['-']),
-                       len(locus.strand_transfrags['.'])))
-        sys.exit(0)
-        # write bedgraph files for expression/recurrence data
+                       len(locus.strand_transfrags[Strand.POS]),
+                       len(locus.strand_transfrags[Strand.NEG]),
+                       len(locus.strand_transfrags[Strand.NA])))
+        # write raw bedgraph files
         locus.write_bedgraph(raw_bgfilehd)
-
         # resolve unstranded transcripts
         num_resolved = locus.impute_unknown_strands()
         if num_resolved > 0:
             logging.debug('Locus %s:%d-%d: %d '
                           'resolved (+: %d, -: %d, .: %d)' %
                           (chrom, start, end, num_resolved,
-                           len(locus.strand_transfrags['+']),
-                           len(locus.strand_transfrags['-']),
-                           len(locus.strand_transfrags['.'])))
-
+                           len(locus.strand_transfrags[Strand.POS]),
+                           len(locus.strand_transfrags[Strand.NEG]),
+                           len(locus.strand_transfrags[Strand.NA])))
         # write bedgraph files after strand resolved
         locus.write_bedgraph(resolved_bgfilehd)
 
     # close bedgraph files
-    Locus.close_bedgraph(raw_bgfilehd)
-    Locus.close_bedgraph(resolved_bgfilehd)
-
-    # update status and write to file
-    # self.status.assemble = True
-    # self.status.write(self.results.status_file)
-    # return EXIT_SUCCESS
+    Locus.close_bedgraphs(raw_bgfilehd)
+    Locus.close_bedgraphs(resolved_bgfilehd)
