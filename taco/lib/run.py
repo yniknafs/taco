@@ -27,7 +27,9 @@ __status__ = "Development"
 
 class Args:
     VERBOSE = False
-    GUIDED = False
+    GUIDED_ASSEMBLY = False
+    GUIDED_STRAND = False
+    GUIDED_ENDS = False
     GTF_EXPR_ATTR = 'TPM'
     MIN_FRAG_LENGTH = 200
     MAX_FRAG_LENGTH = 400
@@ -68,8 +70,22 @@ class Args:
                             help='Option reference GTF file of "true" '
                             'validated transcripts to facilitate guided '
                             'assembly and/or noise filtering')
-        parser.add_argument('--guided', dest='guided', action='store_true',
-                            default=Args.GUIDED,
+        parser.add_argument('--guided-strand', dest='guided_strand',
+                            action='store_true',
+                            default=Args.GUIDED_STRAND,
+                            help='Enable use of reference strand information '
+                            'to help resolve unstranded transfrags (requires '
+                            'reference GTF to be specified using --ref-gtf)')
+        parser.add_argument('--guided-ends', dest='guided_ends',
+                            action='store_true',
+                            default=Args.GUIDED_ENDS,
+                            help='Enable use of reference transcript start '
+                            'and end sites to help truncate transfrags '
+                            '(requires reference GTF to be specified using '
+                            '--ref-gtf)')
+        parser.add_argument('--guided-assembly', dest='guided_assembly',
+                            action='store_true',
+                            default=Args.GUIDED_ASSEMBLY,
                             help='Enable guided assembly (requires a '
                             'reference GTF to be specified using '
                             '--ref-gtf)')
@@ -115,7 +131,9 @@ class Args:
         func(fmt.format('verbose logging:', str(args.verbose)))
         func(fmt.format('output directory:', str(args.output_dir)))
         func(fmt.format('reference GTF file:', str(args.ref_gtf_file)))
-        func(fmt.format('guided mode:', str(args.guided)))
+        func(fmt.format('guided assembly mode:', str(args.guided_assembly)))
+        func(fmt.format('guided strand mode:', str(args.guided_strand)))
+        func(fmt.format('guided ends mode:', str(args.guided_ends)))
         func(fmt.format('GTF expression attribute:', args.gtf_expr_attr))
         func(fmt.format('min fragment length:', args.min_frag_length))
         func(fmt.format('max fragment length:', args.max_frag_length))
@@ -164,8 +182,9 @@ class Args:
                     parser.error("reference GTF file %s not found" %
                                  (args.ref_gtf_file))
                 args.ref_gtf_file = os.path.abspath(args.ref_gtf_file)
-            elif args.guided:
-                parser.error('Guided assembly mode (--guided) requires '
+            elif (args.guided_assembly or args.guided_ends or
+                  args.guided_strand):
+                parser.error('Guided assembly modes require a '
                              'reference GTF (--ref-gtf)')
         return args
 
@@ -178,6 +197,7 @@ class Results(object):
     TRANSFRAGS_GTF_FILE = 'transfrags.gtf'
     TRANSFRAGS_FAIL_GTF_FILE = 'transfrags.fail.gtf'
     AGGREGATE_STATS_FILE = 'aggregate_stats.txt'
+    LOCUS_STATS_FILE = 'locus_stats.txt'
 
     def __init__(self, output_dir):
         self.output_dir = output_dir
@@ -193,11 +213,11 @@ class Results(object):
             os.path.join(output_dir,
                          Results.TRANSFRAGS_GTF_FILE)
         self.transfrags_fail_gtf_file = \
-            os.path.join(output_dir,
-                         Results.TRANSFRAGS_FAIL_GTF_FILE)
+            os.path.join(output_dir, Results.TRANSFRAGS_FAIL_GTF_FILE)
         self.aggregate_stats_file = \
-            os.path.join(output_dir,
-                         Results.AGGREGATE_STATS_FILE)
+            os.path.join(output_dir, Results.AGGREGATE_STATS_FILE)
+        self.locus_stats_file = \
+            os.path.join(output_dir, Results.LOCUS_STATS_FILE)
 
 
 class Status(object):
@@ -291,7 +311,10 @@ class Run(object):
 
     def assemble(self):
         assemble(gtf_file=self.results.transfrags_gtf_file,
-                 output_dir=self.args.output_dir)
+                 output_dir=self.args.output_dir,
+                 guided_strand=self.args.guided_strand,
+                 guided_ends=self.args.guided_ends,
+                 guided_assembly=self.args.guided_assembly)
         # update status and write to file
         # self.status.assemble = True
         # self.status.write(self.results.status_file)

@@ -43,7 +43,6 @@ class GTF:
         SAMPLE_ID = 'sample_id'
         REF = 'ref'
         EXPRESSION = 'expr'
-        RECURRENCE = 'recur'
 
     class Feature:
         '''

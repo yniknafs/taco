@@ -18,9 +18,9 @@ def read_gtf(filename):
     return list(GTF.parse_loci(open(get_gtf_path(filename))))
 
 
-def read_single_locus(filename):
+def read_single_locus(filename, guided_strand=False):
     loci = read_gtf(filename)
     interval, gtf_lines = loci[0]
     t_dict = Transfrag.parse_gtf(gtf_lines)
-    locus = Locus.create(t_dict.values())
-    return locus
+    locus = Locus.create(t_dict.values(), guided_strand=guided_strand)
+    return t_dict, locus

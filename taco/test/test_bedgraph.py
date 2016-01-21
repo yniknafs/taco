@@ -20,7 +20,8 @@ def write_and_read_array(a, ref='chr1', start=0):
 
 def c_write_and_read_array(a, ref='chr1', start=0):
     filename = "tmp.bedgraph"
-    c_array_to_bedgraph(a, ref, start, filename)
+    with open(filename, 'w') as fileh:
+        c_array_to_bedgraph(a, ref, start, fileh)
     a = bedgraph_to_array(open(filename))
     os.remove(filename)
     return a.get(ref, None)
@@ -75,14 +76,19 @@ def test_performance():
     import timeit
 
     def stmt1():
-        a = np.random.random(1000000)
+        a = np.random.random(100000)
         buf = cStringIO.StringIO()
-        array_to_bedgraph(a, ref='chr1', start=0, buf=buf)
+        array_to_bedgraph(a, ref='chr1', start=0, fileh=buf)
+        # filename = "tmp.bedgraph"
+        # with open(filename, 'w') as fileh:
+        #     array_to_bedgraph(a, ref='chr1', start=0, fileh=fileh)
+        # os.remove(filename)
 
     def stmt2():
-        a = np.random.random(1000000)
+        a = np.random.random(100000)
         filename = "tmp.bedgraph"
-        c_array_to_bedgraph(a, ref='chr1', start=0, filename=filename)
+        with open(filename, 'w') as fileh:
+            c_array_to_bedgraph(a, ref='chr1', start=0, fileh=fileh)
         os.remove(filename)
 
     t1 = timeit.Timer(stmt1)

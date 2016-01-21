@@ -69,13 +69,14 @@ class Transfrag(object):
         t_dict = collections.OrderedDict()
         for gtf_line in gtf_lines:
             f = GTF.Feature.from_str(gtf_line)
-            t_id = f.attrs[GTF.Attr.TRANSCRIPT_ID]
             if f.feature == 'transcript':
+                t_id = f.attrs[GTF.Attr.TRANSCRIPT_ID]
                 if t_id in t_dict:
                     raise GTFError("Transcript '%s' duplicate detected" % t_id)
                 t = Transfrag.from_gtf(f)
                 t_dict[t_id] = t
             elif f.feature == 'exon':
+                t_id = f.attrs[GTF.Attr.TRANSCRIPT_ID]
                 if t_id not in t_dict:
                     logging.error('Feature: "%s"' % str(f))
                     raise GTFError("Transcript '%s' exon feature appeared in "
