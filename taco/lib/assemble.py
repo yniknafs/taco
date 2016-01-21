@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 
 from gtf import GTF
-from base import Strand, TacoError
+from base import Strand, TacoError, FLOAT_DTYPE
 from bedgraph import array_to_bedgraph
 from transfrag import Transfrag
 
@@ -82,7 +82,7 @@ class Locus(object):
         self = Locus(guided=guided)
         self.boundaries = find_boundaries(transfrags)
         length = self.boundaries[-1] - self.boundaries[0]
-        self.expr_data = np.zeros((3, length))
+        self.expr_data = np.zeros((3, length), dtype=FLOAT_DTYPE)
         self.strand_data = np.zeros((3, length), dtype=np.bool)
 
         for t in transfrags:
@@ -223,7 +223,7 @@ class Locus(object):
     @staticmethod
     def open_bedgraphs(file_prefix):
         bgfilehs = []
-        for s in [Strand.POS, Strand.NEG, Strand.NA]:
+        for s in (Strand.POS, Strand.NEG, Strand.NA):
             filename = '%s.%s.bedgraph' % (file_prefix, Strand.NAMES[s])
             bgfilehs.append(open(filename, 'w'))
         return bgfilehs
