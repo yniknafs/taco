@@ -67,7 +67,11 @@ def get_splice_graphs(locus):
     # return transcript_graphs
 
 
-def assemble(gtf_file, output_dir,
+def assemble(gtf_file,
+             expr_h5_file,
+             chrom_sizes_file,
+             node_gtf_file,
+             output_dir,
              guided_strand=False,
              guided_ends=False,
              guided_assembly=False):
@@ -76,6 +80,10 @@ def assemble(gtf_file, output_dir,
     raw_bgfilehd = Locus.open_bedgraphs(file_prefix)
     file_prefix = os.path.join(output_dir, 'loci.resolved')
     resolved_bgfilehd = Locus.open_bedgraphs(file_prefix)
+    # setup expression hdf5
+    expr_h5f = Locus.open_expression_hdf5(expr_h5_file, chrom_sizes_file)
+    # setup node gtf file
+    node_fileh = open(node_gtf_file, 'w')
 
     # parse gtf file
     for interval, gtf_lines in GTF.parse_loci(open(gtf_file)):
@@ -86,9 +94,9 @@ def assemble(gtf_file, output_dir,
         logging.debug('Locus %s:%d-%d: '
                       '%d transfrags (+: %d, -: %d, .: %d)' %
                       (chrom, start, end, len(t_dict),
-                       len(locus.strand_transfrags[Strand.POS]),
-                       len(locus.strand_transfrags[Strand.NEG]),
-                       len(locus.strand_transfrags[Strand.NA])))
+                       len(locus.get_transfrags(Strand.POS)),
+                       len(locus.get_transfrags(Strand.NEG)),
+                       len(locus.get_transfrags(Strand.NA))))
         # write raw bedgraph files
         locus.write_bedgraph(raw_bgfilehd)
         # resolve unstranded transcripts
@@ -97,16 +105,27 @@ def assemble(gtf_file, output_dir,
             logging.debug('Locus %s:%d-%d: %d '
                           'resolved (+: %d, -: %d, .: %d)' %
                           (chrom, start, end, num_resolved,
-                           len(locus.strand_transfrags[Strand.POS]),
-                           len(locus.strand_transfrags[Strand.NEG]),
-                           len(locus.strand_transfrags[Strand.NA])))
+                           len(locus.get_transfrags(Strand.POS)),
+                           len(locus.get_transfrags(Strand.NEG)),
+                           len(locus.get_transfrags(Strand.NA))))
         # write bedgraph files after strand resolved
         locus.write_bedgraph(resolved_bgfilehd)
+        locus.write_expression_hdf5(expr_h5f)
 
         # create splice graphs
-        for sg in get_splice_graphs(locus):
-            print 'splice graph', sg.chrom, Strand.to_gtf(sg.strand), sg.start, sg.end
-            pass
+        for slocus in locus.L:
+            if slocus is None:
+                continue
+            G = slocus.create_splice_graph()
+            print len(G)
+
+        # for sg in get_splice_graphs(locus):
+        #    pass
+#            for line in sg.get_change_point_data():
+#                print >>changept_fileh, line
+
+    # close expression
+    expr_h5f.close()
 
     # close bedgraph files
     Locus.close_bedgraphs(raw_bgfilehd)

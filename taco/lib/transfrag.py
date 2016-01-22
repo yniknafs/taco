@@ -50,6 +50,30 @@ class Transfrag(object):
             yield e1.end, e2.start
             e1 = e2
 
+    def itersplices(self):
+        e1 = self.exons[0]
+        for j in xrange(1, len(self.exons)):
+            e2 = self.exons[j]
+            yield e1.end
+            yield e2.start
+            e1 = e2
+
+    @property
+    def txstart(self):
+        '''start of transcription (adjust for strand)'''
+        if self.strand == Strand.NEG:
+            return self.exons[-1][1]
+        else:
+            return self.exons[0][0]
+
+    @property
+    def txstop(self):
+        '''end of transcription (adjust for strand)'''
+        if self.strand == Strand.NEG:
+            return self.exons[0][0]
+        else:
+            return self.exons[-1][1]
+
     @staticmethod
     def from_gtf(f):
         '''GTF.Feature object to Transfrag'''

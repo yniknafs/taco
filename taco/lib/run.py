@@ -10,6 +10,7 @@ import argparse
 import logging
 import pickle
 import json
+import shutil
 
 from base import Sample
 from aggregate import aggregate
@@ -80,9 +81,8 @@ class Args:
                             action='store_true',
                             default=Args.GUIDED_ENDS,
                             help='Enable use of reference transcript start '
-                            'and end sites to help truncate transfrags '
-                            '(requires reference GTF to be specified using '
-                            '--ref-gtf)')
+                            'and end sites during assembly (requires '
+                            'reference GTF to be specified using --ref-gtf)')
         parser.add_argument('--guided-assembly', dest='guided_assembly',
                             action='store_true',
                             default=Args.GUIDED_ASSEMBLY,
@@ -101,6 +101,11 @@ class Args:
                             default=Args.MAX_ISOFORMS,
                             help='Maximum isoforms to report for each '
                             'gene [default=%(default)s]')
+        parser.add_argument('--chrom-sizes', dest='chrom_sizes_file',
+                            metavar='<filename>',
+                            default=None,
+                            help='path to file containing chromosome names '
+                            'and lengths (required)')
         parser.add_argument("-o", "--output-dir", dest="output_dir",
                             metavar='DIR',
                             default=Args.OUTPUT_DIR,
@@ -130,6 +135,7 @@ class Args:
         func(spacer)
         func(fmt.format('verbose logging:', str(args.verbose)))
         func(fmt.format('output directory:', str(args.output_dir)))
+        func(fmt.format('chrom sizes file:', str(args.chrom_sizes_file)))
         func(fmt.format('reference GTF file:', str(args.ref_gtf_file)))
         func(fmt.format('guided assembly mode:', str(args.guided_assembly)))
         func(fmt.format('guided strand mode:', str(args.guided_strand)))
@@ -162,11 +168,19 @@ class Args:
             if os.path.exists(args.output_dir):
                 parser.error("Output directory '%s' already exists" %
                              args.output_dir)
+
             if args.sample_file is None:
                 parser.error("sample file not specified")
             if not os.path.exists(args.sample_file):
                 parser.error("sample file %s not found" % (args.sample_file))
             args.sample_file = os.path.abspath(args.sample_file)
+
+            if args.chrom_sizes_file is None:
+                parser.error('chrom sizes file not specified')
+            if not os.path.exists(args.chrom_sizes_file):
+                parser.error('chrom sizes file %s not found' %
+                             (args.chrom_sizes_file))
+            args.chrom_sizes_file = os.path.abspath(args.chrom_sizes_file)
 
             if args.min_frag_length <= 0:
                 parser.error("min_transcript_length <= 0")
@@ -194,30 +208,32 @@ class Results(object):
     STATUS_FILE = 'status.json'
     ARGS_FILE = 'args.pickle'
     SAMPLE_FILE = 'samples.txt'
+    CHROM_SIZES_FILE = 'chrom.sizes'
     TRANSFRAGS_GTF_FILE = 'transfrags.gtf'
     TRANSFRAGS_FAIL_GTF_FILE = 'transfrags.fail.gtf'
     AGGREGATE_STATS_FILE = 'aggregate_stats.txt'
     LOCUS_STATS_FILE = 'locus_stats.txt'
+    EXPR_H5_FILE = 'expression.h5'
+    NODE_GTF_FILE = 'nodes.gtf'
 
     def __init__(self, output_dir):
         self.output_dir = output_dir
-        self.tmp_dir = \
-            os.path.join(output_dir, Results.TMP_DIR)
-        self.args_file = \
-            os.path.join(output_dir, Results.ARGS_FILE)
-        self.status_file = \
-            os.path.join(output_dir, Results.STATUS_FILE)
-        self.sample_file = \
-            os.path.join(output_dir, Results.SAMPLE_FILE)
+        self.tmp_dir = os.path.join(output_dir, Results.TMP_DIR)
+        self.args_file = os.path.join(output_dir, Results.ARGS_FILE)
+        self.status_file = os.path.join(output_dir, Results.STATUS_FILE)
+        self.sample_file = os.path.join(output_dir, Results.SAMPLE_FILE)
+        self.chrom_sizes_file = \
+            os.path.join(output_dir, Results.CHROM_SIZES_FILE)
         self.transfrags_gtf_file = \
-            os.path.join(output_dir,
-                         Results.TRANSFRAGS_GTF_FILE)
+            os.path.join(output_dir, Results.TRANSFRAGS_GTF_FILE)
         self.transfrags_fail_gtf_file = \
             os.path.join(output_dir, Results.TRANSFRAGS_FAIL_GTF_FILE)
         self.aggregate_stats_file = \
             os.path.join(output_dir, Results.AGGREGATE_STATS_FILE)
         self.locus_stats_file = \
             os.path.join(output_dir, Results.LOCUS_STATS_FILE)
+        self.expr_h5_file = os.path.join(output_dir, Results.EXPR_H5_FILE)
+        self.node_gtf_file = os.path.join(output_dir, Results.NODE_GTF_FILE)
 
 
 class Status(object):
@@ -282,6 +298,9 @@ class Run(object):
             Args.dump(self.args, self.results.args_file)
             # write samples
             Sample.write_tsv(self.samples, self.results.sample_file)
+            # copy chrom sizes file to output directory
+            shutil.copyfile(args.chrom_sizes_file,
+                            self.results.chrom_sizes_file)
             # update status and write to file
             self.status.create = True
             self.status.write(self.results.status_file)
@@ -310,11 +329,17 @@ class Run(object):
         self.status.write(self.results.status_file)
 
     def assemble(self):
-        assemble(gtf_file=self.results.transfrags_gtf_file,
-                 output_dir=self.args.output_dir,
-                 guided_strand=self.args.guided_strand,
-                 guided_ends=self.args.guided_ends,
-                 guided_assembly=self.args.guided_assembly)
+        r = self.results
+        a = self.args
+
+        assemble(gtf_file=r.transfrags_gtf_file,
+                 expr_h5_file=r.expr_h5_file,
+                 chrom_sizes_file=r.chrom_sizes_file,
+                 node_gtf_file=r.node_gtf_file,
+                 output_dir=a.output_dir,
+                 guided_strand=a.guided_strand,
+                 guided_ends=a.guided_ends,
+                 guided_assembly=a.guided_assembly)
         # update status and write to file
         # self.status.assemble = True
         # self.status.write(self.results.status_file)

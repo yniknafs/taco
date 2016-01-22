@@ -19,8 +19,11 @@ __status__ = "Development"
 
 
 extensions = [
-    Extension('taco.lib.cbedgraph',
-              sources=['taco/lib/cbedgraph.pyx'],
+    Extension('taco.lib.cBedGraph',
+              sources=['taco/lib/cBedGraph.pyx'],
+              include_dirs=[numpy_inc]),
+    Extension('taco.lib.cChangePoint',
+              sources=['taco/lib/cChangePoint.pyx'],
               include_dirs=[numpy_inc])
 ]
 
@@ -31,7 +34,7 @@ def main():
           description='transcriptome meta-assembly from rna-seq',
           author='Matthew Iyer and Yashar Niknafs',
           author_email='yniknafs@umich.edu',
-          requires=['numpy', 'networkx'],
+          requires=['numpy', 'networkx', 'h5py'],
           license='GPL',
           platforms='Linux',
           url='https://github.com/yniknafs/taco',

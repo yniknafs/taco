@@ -3,11 +3,12 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import os
 import cStringIO
+import timeit
 import numpy as np
 
-from taco.lib.base import FLOAT_DTYPE
+from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.bedgraph import array_to_bedgraph, bedgraph_to_array
-from taco.lib.cbedgraph import array_to_bedgraph as c_array_to_bedgraph
+from taco.lib.cBedGraph import array_to_bedgraph as c_array_to_bedgraph
 
 
 def write_and_read_array(a, ref='chr1', start=0):
@@ -73,7 +74,6 @@ def test_zeros():
 
 
 def test_performance():
-    import timeit
 
     def stmt1():
         a = np.random.random(100000)

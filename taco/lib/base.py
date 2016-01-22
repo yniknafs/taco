@@ -8,7 +8,6 @@ Copyright (C) 2012-2015 Matthew Iyer
 import collections
 import logging
 import os
-import numpy as np
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2015"
@@ -23,8 +22,6 @@ __status__ = "Development"
 class TacoError(Exception):
     pass
 
-FLOAT_DTYPE = np.float64
-
 Exon = collections.namedtuple('Exon', ['start', 'end'])
 
 
@@ -32,6 +29,8 @@ class Strand:
     POS = 0
     NEG = 1
     NA = 2
+
+    STRANDS = [POS, NEG, NA]
     NAMES = ['pos', 'neg', 'none']
     FROM_GTF = {'+': POS, '-': NEG, '.': NA}
     TO_GTF = {POS: '+', NEG: '-', NA: '.'}

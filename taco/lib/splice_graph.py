@@ -5,8 +5,9 @@ import bisect
 import networkx as nx
 import numpy as np
 
-from base import Exon, Strand, TacoError, FLOAT_DTYPE
-from locus import find_genomic_boundaries
+from base import Exon, Strand, TacoError
+from dtypes import FLOAT_DTYPE
+from cChangePoint import find_change_points
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -16,50 +17,6 @@ __version__ = "0.4.0"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
-
-
-def aggregate_expression_data(transfrags, start, end):
-    # add transfrag expression
-    length = end - start
-    expr_data = np.zeros(length, dtype=FLOAT_DTYPE)
-    for t in transfrags:
-        if t.is_ref:
-            continue
-        for exon in t.exons:
-            astart = exon.start - start
-            aend = exon.end - start
-            expr_data[astart:aend] += t.expr
-    return expr_data
-
-
-def find_zero_sites(a, start=0):
-    '''
-    input: 'a' - numpy array of expression data
-    '''
-    # TODO: port to cython
-    if a.shape[0] == 0:
-        return []
-    if a.shape[0] == 1:
-        return []
-    assert a[0] != 0
-    assert a[-1] != 0
-    boundaries = []
-    for i in xrange(1, a.shape[0]):
-        if (a[i-1] > 0) and (a[i] == 0):
-            boundaries.append(start + i)
-        elif (a[i-1] == 0) and (a[i] > 0):
-            boundaries.append(start + i)
-    return boundaries
-
-
-def find_splice_sites(transfrags):
-    boundaries = set()
-    for t in transfrags:
-        # add intron boundaries
-        for start, end in t.iterintrons():
-            boundaries.add(start)
-            boundaries.add(end)
-    return sorted(boundaries)
 
 
 def split_transfrag(t, boundaries):
@@ -81,41 +38,133 @@ def split_transfrag(t, boundaries):
                 yield boundaries[j], boundaries[j+1]
 
 
+
+def aggregate_expression_data(t, expr_data, start):
+    # add transfrag expression
+    for exon in t.exons:
+        astart = exon.start - start
+        aend = exon.end - start
+        expr_data[astart:aend] += t.expr
+    return expr_data
+
+
+def find_splice_sites(t):
+    a = []
+    for start, end in t.iterintrons():
+        a.append(start)
+        a.append(end)
+    return a
+
+
+def get_start_stop_sites(t):
+    t_start = t.exons[0][0]
+    t_stop = t.exons[-1][1]
+    if t.strand == Strand.NEG:
+        t_start, t_stop = t_stop, t_start
+    return t_start, t_stop
+
+
+
+
 class SpliceGraph(object):
 
     def __init__(self):
+        self.guided_ends = False
+        self.guided_assembly = False
         self.transfrags = None
         self.chrom = None
         self.start = None
         self.end = None
         self.strand = None
-        self.boundaries = None
         self.expr_data = None
-        self.sources = None
-        self.sinks = None
+        self.boundaries = None
+        self.ref_start_sites = None
+        self.ref_stop_sites = None
+        self.start_sites = None
+        self.stop_sites = None
 
     @staticmethod
-    def create(transfrags):
+    def create(transfrags, guided_ends=False, guided_assembly=False):
         self = SpliceGraph()
+        self.guided_ends = guided_ends
+        self.guided_assembly = guided_assembly
         self.transfrags = transfrags
-
-        chrom, start, end, strands = find_genomic_boundaries(transfrags)
-        self.chrom = chrom
-        self.start = start
-        self.end = end
-        assert len(strands) == 1
-        self.strand = strands.pop()
-        # aggregate transfrag expression
-        expr_data = aggregate_expression_data(transfrags, start, end)
-        self.expr_data = expr_data
-        # define graph node boundaries
-        boundaries = set([start, end])
+        # first pass through transfrags to define graph boundaries
+        for t in transfrags:
+            if self.chrom is None:
+                self.chrom = t.chrom
+            elif self.chrom != t.chrom:
+                raise TacoError('chrom mismatch')
+            if self.strand is None:
+                self.strand = t.strand
+            elif self.strand != t.strand:
+                raise TacoError('strand mismatch')
+            if self.start is None:
+                self.start = t.start
+            else:
+                self.start = min(t.start, self.start)
+            if self.end is None:
+                self.end = t.end
+            else:
+                self.end = max(t.end, self.end)
+        # second pass through transfrags to aggregate expression and
+        # determine node boundaries
+        length = self.end - self.start
+        self.expr_data = np.zeros(length, dtype=FLOAT_DTYPE)
+        self.boundaries = set([self.start, self.end])
+        self.ref_start_sites = set()
+        self.ref_stop_sites = set()
+        for t in transfrags:
+            if t.is_ref:
+                t_start, t_stop = get_start_stop_sites(t)
+                self.ref_start_sites.add(t_start)
+                self.ref_stop_sites.add(t_stop)
+                if guided_assembly:
+                    self.boundaries.update(find_splice_sites(t))
+                if guided_ends:
+                    self.boundaries.update((t_start, t_stop))
+            else:
+                aggregate_expression_data(t, self.expr_data, self.start)
+                self.boundaries.update(find_splice_sites(t))
         # nodes bounded by internal regions with zero expression
-        boundaries.update(find_zero_sites(expr_data, start=start))
-        # nodes bounded by introns
-        boundaries.update(find_splice_sites(transfrags))
-        self.boundaries = sorted(boundaries)
+        zero_sites = find_change_points(self.expr_data, start=self.start)
+        self.boundaries.update(zero_sites)
+        self.boundaries = sorted(self.boundaries)
         return self
+
+    def get_change_point_data(self):
+        def get_region(start, end):
+            # subset expression array
+            astart = start - self.start
+            aend = end - self.start
+            expr_data = self.expr_data[astart:aend]
+            # extract reference start/stop sites that occur within the region
+            ref_starts = []
+            for x in self.ref_start_sites:
+                if (x >= start) and (x < end):
+                    ref_starts.append(x - start)
+            ref_starts.sort()
+            ref_stops = []
+            for x in self.ref_stop_sites:
+                if (x > start) and (x <= end):
+                    ref_stops.append(x - start)
+            ref_stops.sort()
+            return expr_data, ref_starts, ref_stops
+
+        assert len(self.boundaries) >= 2
+        bstart = self.boundaries[0]
+        for bend in self.boundaries[1:]:
+            expr_data, ref_starts, ref_stops = \
+                get_region(bstart, bend)
+            if expr_data.sum() == 0:
+                continue
+            line = '\t'.join([self.chrom, str(bstart), str(bend),
+                              Strand.to_gtf(self.strand),
+                              ','.join(map(str, ref_starts)),
+                              ','.join(map(str, ref_stops)),
+                              ','.join(map(str, expr_data))])
+            yield line
+            bstart = bend
 
     def construct_graph(self):
         def add_node(G, n):

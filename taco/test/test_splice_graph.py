@@ -1,42 +1,43 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
-import pytest
 import numpy as np
 
+from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.transfrag import Transfrag
-from taco.lib.splice_graph import aggregate_expression_data, find_zero_sites, \
-    find_splice_sites, SpliceGraph, split_transfrag
-from taco.lib.base import Strand
+from taco.lib.splice_graph import aggregate_expression_data, \
+    find_change_points, find_splice_sites, SpliceGraph, split_transfrag
+from taco.lib.cChangePoint import find_change_points as c_find_change_points
 from taco.test.base import read_gtf, read_single_locus
 
 
-def test_find_zero_sites():
-    a = np.ones(10)
-    assert len(find_zero_sites(a)) == 0
-    a = np.zeros(10)
-    with pytest.raises(AssertionError):
-        find_zero_sites(a)
-    a = np.array([0, 1, 1, 0])
-    with pytest.raises(AssertionError):
-        find_zero_sites(a)
-    a = np.array([1, 0, 0, 0, 1])
-    assert tuple(find_zero_sites(a)) == (1, 4)
-    a = np.array([1, 0, 1, 0, 1])
-    assert tuple(find_zero_sites(a)) == (1, 2, 3, 4)
+def test_find_change_points():
+    for func in (find_change_points, c_find_change_points):
+        a = np.ones(10, dtype=FLOAT_DTYPE)
+        assert len(func(a)) == 0
+        a = np.zeros(10, dtype=FLOAT_DTYPE)
+        assert len(func(a)) == 0
+        a = np.array([0, 1, 1, 0], dtype=FLOAT_DTYPE)
+        assert tuple(func(a)) == (1, 3)
+        a = np.array([1, 0, 0, 0, 1], dtype=FLOAT_DTYPE)
+        assert tuple(func(a)) == (1, 4)
+        a = np.array([1, 0, 1, 0, 1], dtype=FLOAT_DTYPE)
+        assert tuple(func(a)) == (1, 2, 3, 4)
 
 
 def test_find_boundaries():
-    loci = read_gtf('splice_sites.gtf')
-    interval, gtf_lines = loci[0]
-    chrom, start, end = interval
-    transfrags = Transfrag.parse_gtf(gtf_lines).values()
-    # splice sites only
-    splice_sites = tuple(find_splice_sites(transfrags))
+    t_dict, locus = read_single_locus('splice_sites.gtf')
+    transfrags = t_dict.values()
+    splice_sites = set()
+    for t in transfrags:
+        splice_sites.update(find_splice_sites(t))
+    splice_sites = tuple(sorted(splice_sites))
     assert splice_sites == (100, 200, 250, 300, 400)
     # internal zero sites only
-    a = aggregate_expression_data(transfrags, start, end)
-    zero_sites = tuple(find_zero_sites(a, start))
+    expr_data = np.zeros((locus.end - locus.start), dtype=FLOAT_DTYPE)
+    for t in transfrags:
+        aggregate_expression_data(t, expr_data, locus.start)
+    zero_sites = tuple(find_change_points(expr_data, locus.start))
     assert zero_sites == (100, 150, 300, 375)
     # combined boundaries
     sg = SpliceGraph.create(transfrags)
@@ -62,3 +63,10 @@ def test_split_transfrag():
     t = t_dict['D']
     nodes = tuple(split_transfrag(t, boundaries))
     assert nodes == ((375, 400), (400, 525))
+
+
+def test_ref_starts_ends():
+    t_dict, locus = read_single_locus('splice_graph.gtf')
+    sg = SpliceGraph.create(t_dict.values())
+    assert tuple(sorted(sg.ref_start_sites)) == (95,)
+    assert tuple(sorted(sg.ref_stop_sites)) == (200,)

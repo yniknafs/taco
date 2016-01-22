@@ -4,7 +4,7 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 import collections
 import numpy as np
 
-from taco.lib.base import FLOAT_DTYPE
+from taco.lib.dtypes import FLOAT_DTYPE
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
