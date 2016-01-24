@@ -76,7 +76,7 @@ def test_zeros():
 def test_performance():
 
     def stmt1():
-        a = np.random.random(100000)
+        a = np.array(np.random.random(100000), dtype=FLOAT_DTYPE)
         buf = cStringIO.StringIO()
         array_to_bedgraph(a, ref='chr1', start=0, fileh=buf)
         # filename = "tmp.bedgraph"
@@ -85,7 +85,7 @@ def test_performance():
         # os.remove(filename)
 
     def stmt2():
-        a = np.random.random(100000)
+        a = np.array(np.random.random(100000), dtype=FLOAT_DTYPE)
         filename = "tmp.bedgraph"
         with open(filename, 'w') as fileh:
             c_array_to_bedgraph(a, ref='chr1', start=0, fileh=fileh)

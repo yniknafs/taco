@@ -2,6 +2,7 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import logging
+import collections
 import bisect
 import numpy as np
 import networkx as nx
@@ -9,6 +10,7 @@ import h5py
 
 from base import Strand, TacoError, Exon
 from dtypes import FLOAT_DTYPE, H5_CHUNKSIZE
+from gtf import GTF
 from cBedGraph import array_to_bedgraph
 from cChangePoint import find_change_points
 
@@ -78,7 +80,6 @@ def split_transfrag(t, boundaries):
         start_ind = bisect.bisect_right(boundaries, exon.start)
         end_ind = bisect.bisect_left(boundaries, exon.end)
         if start_ind == end_ind:
-            print boundaries, start_ind, end_ind, exon.start, exon.end, 'isref', t.is_ref, 'SDFLKJSDF'
             yield boundaries[start_ind-1], boundaries[start_ind]
         else:
             # all the splice sites in between the exon borders must overlap
@@ -86,73 +87,92 @@ def split_transfrag(t, boundaries):
                 yield boundaries[j], boundaries[j+1]
 
 
+def _array_subset(a, start, end):
+    '''
+    return elements of sorted array 'a' where all elements of
+    'start' < a[i] < 'end'
+    '''
+    assert start <= end
+    if len(a) == 0:
+        return []
+    i = bisect.bisect_right(a, start)
+    j = bisect.bisect_right(a, end)
+    return a[i:j]
+
+
 class StrandedLocus(object):
-    def __init__(self, chrom, start, end, strand,
-                 guided_strand=False,
-                 guided_ends=False,
-                 guided_assembly=False):
-        self.guided_strand = guided_strand
-        self.guided_ends = guided_ends
-        self.guided_assembly = guided_assembly
+    def __init__(self):
+        self.guided_ends = False
+        self.guided_assembly = False
         self.transfrags = []
-        self.chrom = chrom
-        self.start = start
-        self.end = end
-        self.strand = strand
-        self.expr_data = np.zeros((end - start), dtype=FLOAT_DTYPE)
-        self.strand_data = np.zeros((end - start), dtype=np.bool)
+        self.chrom = None
+        self.start = None
+        self.end = None
+        self.strand = None
+        self.expr_data = None
         self.ref_start_sites = set()
         self.ref_stop_sites = set()
         self.start_sites = set()
         self.stop_sites = set()
-        self.node_bounds = None
 
-    def add_transfrag(self, t):
-        if t.chrom != self.chrom:
-            raise TacoError('chrom mismatch')
-        if t.strand != self.strand:
-            raise TacoError('strand mismatch')
-        if t.start < self.start:
-            raise TacoError('transfrag start < locus start')
-        if t.end > self.end:
-            raise TacoError('transfrag end < locus end')
-        self.transfrags.append(t)
-        for exon in t.exons:
-            astart = exon.start - self.start
-            aend = exon.end - self.start
+    @staticmethod
+    def create(transfrags,
+               guided_ends=False,
+               guided_assembly=False):
+        self = StrandedLocus()
+        self.guided_ends = guided_ends
+        self.guided_assembly = guided_assembly
+
+        for t in transfrags:
+            if self.chrom is None:
+                self.chrom = t.chrom
+            elif self.chrom != t.chrom:
+                raise TacoError('chrom mismatch')
+            if self.strand is None:
+                self.strand = t.strand
+            elif self.strand != t.strand:
+                raise TacoError('chrom mismatch')
+            if self.start is None:
+                self.start = t.start
+            else:
+                self.start = min(t.start, self.start)
+            if self.end is None:
+                self.end = t.end
+            else:
+                self.end = max(t.end, self.end)
             if t.is_ref:
                 self.ref_start_sites.add(t.txstart)
                 self.ref_stop_sites.add(t.txstop)
-                if self.guided_strand:
-                    self.strand_data[astart:aend] = True
-            else:
-                self.expr_data[astart:aend] += t.expr
-                self.strand_data[astart:aend] = True
+            self.transfrags.append(t)
+
+        self.ref_start_sites = sorted(self.ref_start_sites)
+        self.ref_stop_sites = sorted(self.ref_stop_sites)
+        self.expr_data = np.zeros(self.end - self.start, dtype=FLOAT_DTYPE)
+        for t in self.transfrags:
+            if not t.is_ref:
+                for exon in t.exons:
+                    astart = exon.start - self.start
+                    aend = exon.end - self.start
+                    self.expr_data[astart:aend] += t.expr
+        return self
 
     def get_expr_data(self, start, end):
-        return _copy1d(self.expr_data, self.start, self.end,
-                       start, end)
-
-    def write_bedgraph(self, fileh):
-        array_to_bedgraph(a=self.expr_data,
-                          ref=self.chrom,
-                          start=self.start,
-                          fileh=fileh)
-
-    def write_expression_hdf5(self, h5f):
-        '''writes locus expression to 'h5f' an h5py.File object'''
-        grp = '%s/%s' % (self.chrom, Strand.NAMES[self.strand])
-        dset = h5f[grp]
-        dset[self.start:self.end] = self.expr_data
+        assert start >= self.start
+        assert end <= self.end
+        if ((start < self.start) or (end > self.end)):
+            m = ('query %d-%d outside locus bounds %d-%d' %
+                 (start, end, self.start, self.end))
+            raise TacoError(m)
+        astart = start - self.start
+        aend = end - self.start
+        return self.expr_data[astart:aend]
 
     def _find_node_boundaries(self):
-        node_bounds = set()
+        node_bounds = set((self.start, self.end))
         # nodes bounded by regions where expression changes to/from zero
         zero_points = find_change_points(self.expr_data, start=self.start)
         node_bounds.update(zero_points)
         # nodes bounded by introns
-        start = None
-        end = None
         for t in self.transfrags:
             if t.is_ref:
                 if self.guided_ends:
@@ -161,25 +181,17 @@ class StrandedLocus(object):
                     node_bounds.update(t.itersplices())
             else:
                 node_bounds.update(t.itersplices())
-                if start is None:
-                    start = t.start
-                else:
-                    start = min(t.start, start)
-                if end is None:
-                    end = t.end
-                else:
-                    end = max(t.end, end)
-        node_bounds.add(start)
-        node_bounds.add(end)
-        print 'node bounds', sorted(node_bounds)
         return sorted(node_bounds)
 
     def create_splice_graph(self):
+        '''
+        returns networkx DiGraph object
+        '''
         def add_node(G, n):
             if n not in G:
                 G.add_node(n, length=(n.end - n.start), expr=None)
 
-        boundaries = self._find_node_boundaries()
+        node_bounds = self._find_node_boundaries()
         G = nx.DiGraph()
         for t in self.transfrags:
             if t.is_ref and not self.guided_assembly:
@@ -187,7 +199,7 @@ class StrandedLocus(object):
             # split exons that cross boundaries and get the
             # nodes that made up the transfrag
             nodes = [Exon(a, b) for (a, b) in
-                     split_transfrag(t, boundaries)]
+                     split_transfrag(t, node_bounds)]
             if self.strand == Strand.NEG:
                 nodes.reverse()
             # add nodes/edges to graph
@@ -198,23 +210,97 @@ class StrandedLocus(object):
                 add_node(G, v)
                 G.add_edge(u, v)
                 u = v
+
         # set graph attributes
-        G.graph['boundaries'] = boundaries
+        G.graph['transfrags'] = self.transfrags
         G.graph['chrom'] = self.chrom
-        G.graph['start'] = boundaries[0]
-        G.graph['end'] = boundaries[-1]
+        G.graph['start'] = self.start
+        G.graph['end'] = self.end
         G.graph['strand'] = self.strand
-        G.graph['expr_data'] = self.get_expr_data(boundaries[0], boundaries[1])
         return G
+
+    def get_node_gtf(self):
+        locus_id = ('L_%s_%d_%d_%s' %
+                    (self.chrom, self.start, self.end,
+                     Strand.to_gtf(self.strand)))
+        # iterate through locus and return change point data
+        G = self.create_splice_graph()
+        for n in sorted(G):
+            expr_data = self.get_expr_data(*n)
+            ref_starts = _array_subset(self.ref_start_sites, *n)
+            ref_stops = _array_subset(self.ref_stop_sites, *n)
+            # return gtf feature for each node
+            f = GTF.Feature()
+            f.seqid = self.chrom
+            f.source = 'taco'
+            f.feature = 'node'
+            f.start = n[0]
+            f.end = n[1]
+            f.score = 0
+            f.strand = Strand.to_gtf(self.strand)
+            f.phase = '.'
+            f.attrs = {'locus_id': locus_id,
+                       'expr_min': str(expr_data.min()),
+                       'expr_max': str(expr_data.max()),
+                       'expr_mean': str(expr_data.mean()),
+                       'ref_starts': ','.join(map(str, ref_starts)),
+                       'ref_stops': ','.join(map(str, ref_stops))}
+            yield f
+
+    def split_splice_graph(self, G):
+        # get connected components of graph which represent independent genes
+        # unconnected components are considered different genes
+        Gsubs = list(nx.weakly_connected_component_subgraphs(G))
+
+        if len(Gsubs) == 1:
+            Gsub = Gsubs[0]
+            # set graph attributes
+            Gsub.graph['transfrags'] = self.transfrags
+            Gsub.graph['chrom'] = self.chrom
+            Gsub.graph['start'] = self.start
+            Gsub.graph['end'] = self.end
+            Gsub.graph['strand'] = self.strand
+            return Gsubs
+        else:
+            # map nodes to components
+            node_subgraph_map = {}
+            transfrag_subgraph_map = collections.defaultdict(list)
+            for i, Gsub in enumerate(Gsubs):
+                for n in Gsub:
+                    node_subgraph_map[n] = i
+            # assign transfrags to components
+            for t in self.transfrags:
+                if t.is_ref and not self.guided_assembly:
+                    continue
+                for n in split_transfrag(t, boundaries):
+                    n = Exon(*n)
+                    subgraph_id = node_subgraph_map[n]
+                    transfrag_subgraph_map[subgraph_id].append(t)
+                    break
+            # set graph attributes
+            for i, G in enumerate(Gsubs):
+                # set graph attributes
+                G.graph['transfrags'] = transfrag_subgraph_map[i]
+                G.graph['chrom'] = self.chrom
+                G.graph['start'] = self.start
+                G.graph['end'] = self.end
+
+                G.graph['strand'] = self.strand
+            return Gsubs
 
 
 class Locus(object):
     def __init__(self):
+        self.guided_strand = False
+        self.guided_ends = False
+        self.guided_assembly = False
         self.chrom = None
         self.start = None
         self.end = None
-        self.strands = None
-        self.L = [None, None, None]
+        self.strands = set()
+        self.expr_data = None
+        self.strand_data = None
+        self.strand_transfrags = [[], [], []]
 
     @staticmethod
     def create(transfrags,
@@ -222,26 +308,46 @@ class Locus(object):
                guided_ends=False,
                guided_assembly=False):
         self = Locus()
+        self.guided_strand = guided_strand
+        self.guided_ends = guided_ends
+        self.guided_assembly = guided_assembly
         # find locus boundaries
         chrom, start, end, strands = _find_boundaries(transfrags)
         self.chrom = chrom
         self.start = start
         self.end = end
-        self.strands = strands
-        # create stranded loci
-        for s in self.strands:
-            self.L[s] = StrandedLocus(chrom=chrom,
-                                      start=start,
-                                      end=end,
-                                      strand=s,
-                                      guided_strand=guided_strand,
-                                      guided_ends=guided_ends,
-                                      guided_assembly=guided_assembly)
+        self.strands.update(strands)
+        # setup expression arrays
+        self.expr_data = np.zeros((3, (end - start)), dtype=FLOAT_DTYPE)
+        self.strand_data = np.zeros((3, (end - start)), dtype=np.bool)
         # add transcripts to locus
         for t in transfrags:
-            slocus = self.L[t.strand]
-            slocus.add_transfrag(t)
+            self._add_transfrag(t)
         return self
+
+    def _add_transfrag(self, t):
+        if t.chrom != self.chrom:
+            raise TacoError('chrom mismatch')
+        if t.start < self.start:
+            raise TacoError('transfrag start < locus start')
+        if t.end > self.end:
+            raise TacoError('transfrag end < locus end')
+        self.strands.add(t.strand)
+        self.strand_transfrags[t.strand].append(t)
+        for exon in t.exons:
+            astart = exon.start - self.start
+            aend = exon.end - self.start
+            if t.is_ref and self.guided_strand:
+                self.strand_data[t.strand, astart:aend] = True
+            else:
+                self.expr_data[t.strand, astart:aend] += t.expr
+                self.strand_data[t.strand, astart:aend] = True
+
+    def create_stranded_loci(self):
+        for s in self.strands:
+            yield StrandedLocus.create(self.strand_transfrags[s],
+                                       guided_ends=self.guided_ends,
+                                       guided_assembly=self.guided_assembly)
 
     def _check_strand_ambiguous(self, t):
         '''
@@ -253,10 +359,9 @@ class Locus(object):
             start = exon.start - self.start
             end = exon.end - self.start
             for s in (Strand.POS, Strand.NEG):
-                locus = self.L[s]
-                if locus and locus.strand_data[start:end].any():
+                if self.strand_data[s, start:end].any():
                     strands[s] = True
-                if locus and locus.expr_data[start:end].sum() > 0:
+                if self.expr_data[s, start:end].sum() > 0:
                     strands[s] = True
         if strands[Strand.POS] and strands[Strand.NEG]:
             return Strand.NA
@@ -267,13 +372,11 @@ class Locus(object):
         return Strand.NA
 
     def impute_unknown_strands(self):
-        if self.L[Strand.NA] is None:
-            return
-        unstranded_transfrags = self.L[Strand.NA].transfrags
         # iteratively predict strand of unstranded transfrags
         # stop when no new transfrag strands can be imputed
         iterations = 0
         num_resolved = 0
+        unstranded_transfrags = self.strand_transfrags[Strand.NA]
         while(len(unstranded_transfrags) > 0):
             resolved = []
             unresolved = []
@@ -290,23 +393,19 @@ class Locus(object):
             # add resolved transfrags to new strand
             for t, new_strand in resolved:
                 t.strand = new_strand
-                self.L[new_strand].add_transfrag(t)
+                self._add_transfrag(t)
             unstranded_transfrags = unresolved
             iterations += 1
 
         if num_resolved > 0:
-            # clear unstranded locus and re-add unresolved transcripts
-            oldlocus = self.L[Strand.NA]
-            locus = StrandedLocus(chrom=oldlocus.chrom,
-                                  start=oldlocus.start,
-                                  end=oldlocus.end,
-                                  strand=oldlocus.strand,
-                                  guided_strand=oldlocus.guided_strand,
-                                  guided_ends=oldlocus.guided_ends,
-                                  guided_assembly=oldlocus.guided_assembly)
+            # clear unstranded locus
+            self.strand_data[Strand.NA, :] = False
+            self.expr_data[Strand.NA, :] = 0.0
+            self.strands.remove(Strand.NA)
+            # re-add unstranded transfrags
             for t in unstranded_transfrags:
-                locus.add_transfrag(t)
-            self.L[Strand.NA] = locus
+                self._add_transfrag(t)
+            self.strand_transfrags[Strand.NA] = unstranded_transfrags
 
         if iterations > 0:
             logging.debug('predict_unknown_strands: %d iterations' %
@@ -318,16 +417,12 @@ class Locus(object):
             m = ('query %d-%d outside locus bounds %d-%d' %
                  (start, end, self.start, self.end))
             raise TacoError(m)
-        locus = self.L[strand]
-        if locus is None:
-            return np.zeros(end - start, dtype=FLOAT_DTYPE)
-        return locus.get_expr_data(start, end)
+        astart = start - self.start
+        aend = end - self.start
+        return self.expr_data[strand, astart:aend]
 
     def get_transfrags(self, strand):
-        slocus = self.L[strand]
-        if slocus is None:
-            return []
-        return slocus.transfrags
+        return self.strand_transfrags[strand]
 
     @staticmethod
     def open_bedgraphs(file_prefix):
@@ -343,11 +438,11 @@ class Locus(object):
             fileh.close()
 
     def write_bedgraph(self, bgfilehs):
-        for s in (Strand.POS, Strand.NEG, Strand.NA):
-            slocus = self.L[s]
-            if slocus is None:
-                continue
-            slocus.write_bedgraph(bgfilehs[s])
+        for s in self.strands:
+            array_to_bedgraph(a=self.expr_data[s, :],
+                              ref=self.chrom,
+                              start=self.start,
+                              fileh=bgfilehs[s])
 
     @staticmethod
     def open_expression_hdf5(filename, chrom_sizes_file):
@@ -360,21 +455,17 @@ class Locus(object):
         # create h5py datasets
         h5f = h5py.File(filename, mode='a', libver='latest')
         for ref, length in chrom_sizes.iteritems():
-            for s in Strand.STRANDS:
-                grp = '%s/%s' % (ref, Strand.NAMES[s])
-                chunksize = min(H5_CHUNKSIZE, length)
-                h5f.require_dataset(grp, shape=(length,),
-                                    dtype=FLOAT_DTYPE,
-                                    exact=True,
+            chunksize = (3, min(H5_CHUNKSIZE, length))
+            h5f.require_dataset(ref, shape=(3, length),
+                                dtype=FLOAT_DTYPE,
+                                exact=True,
 #                                    chunks=True,
-                                    chunks=(chunksize,),
-                                    compression='lzf',
-                                    shuffle=True)
+                                chunks=chunksize,
+                                compression='lzf',
+                                shuffle=True)
         return h5f
 
     def write_expression_hdf5(self, h5f):
         '''writes locus expression to 'h5f' an h5py.File object'''
-        for slocus in self.L:
-            if slocus is None:
-                continue
-            slocus.write_expression_hdf5(h5f)
+        dset = h5f[self.chrom]
+        dset[:, self.start:self.end] = self.expr_data
