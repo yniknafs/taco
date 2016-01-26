@@ -66,8 +66,8 @@ def assemble(gtf_file,
         locus.write_expression_hdf5(expr_h5f)
 
         # convert to stranded locus objects
-        for slocus in locus.create_stranded_loci():
-            for f in slocus.get_node_gtf():
+        for sgraph in locus.create_splice_graphs():
+            for f in sgraph.get_node_gtf():
                 print >>node_gtf_fileh, str(f)
 
     # close node file

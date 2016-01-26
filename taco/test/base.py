@@ -20,6 +20,7 @@ def read_gtf(filename):
 
 def read_single_locus(filename, guided_strand=False):
     loci = read_gtf(filename)
+    assert len(loci) == 1
     interval, gtf_lines = loci[0]
     t_dict = Transfrag.parse_gtf(gtf_lines)
     locus = Locus.create(t_dict.values(), guided_strand=guided_strand)

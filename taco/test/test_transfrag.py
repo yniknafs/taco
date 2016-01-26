@@ -2,10 +2,7 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 from taco.lib.transfrag import Transfrag
-from taco.lib.locus import StrandedLocus
 from taco.lib.base import Exon, Strand
-
-from taco.test.base import read_single_locus
 
 
 def test_introns():
@@ -23,10 +20,3 @@ def test_splices():
     splice_sites = frozenset(t.itersplices())
     assert len(splice_sites) == 4
     assert splice_sites == frozenset((10, 20, 30, 40))
-
-
-def test_ref_starts_ends():
-    t_dict, locus = read_single_locus('change_point.gtf')
-    sg = StrandedLocus.create(t_dict.values())
-    assert tuple(sorted(sg.ref_start_sites)) == (95,)
-    assert tuple(sorted(sg.ref_stop_sites)) == (200,)

@@ -9,7 +9,8 @@ from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.transfrag import Transfrag
 from taco.lib.cChangePoint import find_change_points as c_find_change_points
 from taco.lib.changepoint import find_change_points
-from taco.lib.locus import Locus, StrandedLocus, split_transfrag
+from taco.lib.locus import Locus
+from taco.lib.splicegraph import _split_transfrag, SpliceGraph
 
 from taco.test.base import read_gtf, read_single_locus
 
@@ -28,7 +29,7 @@ def test_find_change_points():
         assert tuple(func(a)) == (1, 2, 3, 4)
 
 
-def test_find_boundaries():
+def test_find_node_boundaries():
     t_dict, locus = read_single_locus('splice_sites.gtf')
     transfrags = t_dict.values()
     splice_sites = set()
@@ -37,39 +38,46 @@ def test_find_boundaries():
     splice_sites = tuple(sorted(splice_sites))
     assert splice_sites == (100, 200, 250, 300, 400)
     # aggregate expression
-    slocus = StrandedLocus.create(transfrags)
+    sg = SpliceGraph.create(transfrags)
     # zero change points
-    zero_sites = tuple(find_change_points(slocus.expr_data, slocus.start))
+    zero_sites = tuple(find_change_points(sg.expr_data, sg.start))
     assert zero_sites == (100, 150, 300, 375)
     # combined boundaries
-    boundaries = tuple(slocus._find_node_boundaries())
+    boundaries = tuple(sg._find_node_boundaries())
     assert boundaries == (10, 100, 150, 200, 250, 300, 375, 400, 525)
+
+
+def test_ref_starts_ends():
+    t_dict, locus = read_single_locus('change_point.gtf')
+    sg = SpliceGraph.create(t_dict.values())
+    assert tuple(sorted(sg.ref_start_sites)) == (95,)
+    assert tuple(sorted(sg.ref_stop_sites)) == (200,)
 
 
 def test_split_transfrag():
     loci = read_gtf('splice_sites.gtf')
     interval, gtf_lines = loci[0]
     t_dict = Transfrag.parse_gtf(gtf_lines)
-    sg = StrandedLocus.create(t_dict.values())
+    sg = SpliceGraph.create(t_dict.values())
     boundaries = tuple(sg._find_node_boundaries())
     # check nodes
     t = t_dict['A']
-    nodes = tuple(split_transfrag(t, boundaries))
+    nodes = tuple(_split_transfrag(t, boundaries))
     assert nodes == ((10, 100), (200, 250), (250, 300), (400, 525))
     t = t_dict['B']
-    nodes = tuple(split_transfrag(t, boundaries))
+    nodes = tuple(_split_transfrag(t, boundaries))
     assert nodes == ((10, 100), (250, 300), (400, 525))
     t = t_dict['C']
-    nodes = tuple(split_transfrag(t, boundaries))
+    nodes = tuple(_split_transfrag(t, boundaries))
     assert nodes == ((150, 200), (200, 250), (250, 300), (400, 525))
     t = t_dict['D']
-    nodes = tuple(split_transfrag(t, boundaries))
+    nodes = tuple(_split_transfrag(t, boundaries))
     assert nodes == ((375, 400), (400, 525))
 
 
-def test_multi_strand():
+def test_multi_strand1():
     # read gtf and test basic values
-    loci = read_gtf('locus_multi_strand.gtf')
+    loci = read_gtf('multi_strand1.gtf')
     assert len(loci) == 1
     interval, gtf_lines = loci[0]
     assert interval == ('chr1', 100, 1000)
@@ -79,58 +87,70 @@ def test_multi_strand():
     assert locus.chrom == 'chr1'
     assert locus.start == 100
     assert locus.end == 1000
-    # raise exception when creating StrandedLocus with multiple strands
+    # raise exception when creating with multiple strands
     with pytest.raises(TacoError):
-        StrandedLocus.create(t_dict.values())
+        SpliceGraph.create(t_dict.values())
     transfrags_pos = locus.get_transfrags(Strand.POS)
     transfrags_neg = locus.get_transfrags(Strand.NEG)
-    # create StrandedLocus
-    slocus_pos = StrandedLocus.create(transfrags_pos)
-    slocus_neg = StrandedLocus.create(transfrags_neg)
+    sgpos = SpliceGraph.create(transfrags_pos)
+    sgneg = SpliceGraph.create(transfrags_neg)
 
-    # test locus boundaries and expression levels
-    assert slocus_pos.chrom == 'chr1'
-    assert slocus_pos.start == 100
-    assert slocus_pos.end == 650
-    assert slocus_pos.strand == Strand.POS
-    assert slocus_pos.ref_start_sites == [150]
-    assert slocus_pos.ref_stop_sites == [600]
+    # test
+    assert sgpos.chrom == 'chr1'
+    assert sgpos.start == 100
+    assert sgpos.end == 650
+    assert sgpos.strand == Strand.POS
+    assert sgpos.ref_start_sites == [150]
+    assert sgpos.ref_stop_sites == [600]
     with pytest.raises(AssertionError):
-        slocus_pos.get_expr_data(90, 110)
+        sgpos.get_expr_data(90, 110)
     with pytest.raises(AssertionError):
-        slocus_pos.get_expr_data(650, 655)
-    assert np.array_equal(slocus_pos.get_expr_data(100, 105), np.ones(5))
+        sgpos.get_expr_data(650, 655)
+    assert np.array_equal(sgpos.get_expr_data(100, 105), np.ones(5))
 
-    assert slocus_neg.chrom == 'chr1'
-    assert slocus_neg.start == 350
-    assert slocus_neg.end == 1000
-    assert slocus_neg.strand == Strand.NEG
-    assert slocus_neg.ref_start_sites == [1000]
-    assert slocus_neg.ref_stop_sites == [350]
+    assert sgneg.chrom == 'chr1'
+    assert sgneg.start == 350
+    assert sgneg.end == 1000
+    assert sgneg.strand == Strand.NEG
+    assert sgneg.ref_start_sites == [1000]
+    assert sgneg.ref_stop_sites == [350]
     with pytest.raises(AssertionError):
-        slocus_neg.get_expr_data(340, 350)
+        sgneg.get_expr_data(340, 350)
     with pytest.raises(AssertionError):
-        slocus_neg.get_expr_data(1000, 1010)
-    assert np.array_equal(slocus_neg.get_expr_data(400, 405), np.ones(5))
-    assert np.array_equal(slocus_neg.get_expr_data(945, 950), np.zeros(5))
-    assert np.array_equal(slocus_neg.get_expr_data(950, 955), np.ones(5))
-    assert np.array_equal(slocus_neg.get_expr_data(980, 985), np.zeros(5))
+        sgneg.get_expr_data(1000, 1010)
+    assert np.array_equal(sgneg.get_expr_data(400, 405), np.ones(5))
+    assert np.array_equal(sgneg.get_expr_data(945, 950), np.zeros(5))
+    assert np.array_equal(sgneg.get_expr_data(950, 955), np.ones(5))
+    assert np.array_equal(sgneg.get_expr_data(980, 985), np.zeros(5))
 
     # test locus boundaries
-    bpos = tuple(slocus_pos._find_node_boundaries())
+    bpos = tuple(sgpos._find_node_boundaries())
     assert bpos == tuple((100, 200, 300, 400, 650))
-    bneg = tuple(slocus_neg._find_node_boundaries())
+    bneg = tuple(sgneg._find_node_boundaries())
     assert bneg == tuple((350, 400, 500, 950, 980, 1000))
 
     # added guided ends/assembly to use boundaries from reference
-    lpos = StrandedLocus.create(transfrags_pos,
-                                guided_ends=True,
-                                guided_assembly=True)
+    lpos = SpliceGraph.create(transfrags_pos,
+                              guided_ends=True,
+                              guided_assembly=True)
     bpos = tuple(lpos._find_node_boundaries())
     assert bpos == tuple((100, 150, 200, 300, 400, 500, 600, 650))
 
-    lneg = StrandedLocus.create(transfrags_neg,
-                                guided_ends=True,
-                                guided_assembly=True)
+    lneg = SpliceGraph.create(transfrags_neg,
+                              guided_ends=True,
+                              guided_assembly=True)
     bneg = tuple(lneg._find_node_boundaries())
     assert bneg == tuple((350, 400, 500, 750, 900, 950, 980, 1000))
+
+
+def test_multi_strand2():
+    t_dict, locus = read_single_locus('multi_strand2.gtf')
+    transfrags_pos = locus.get_transfrags(Strand.POS)
+    sgpos = SpliceGraph.create(transfrags_pos)
+    sgdict = {}
+    for sg in sgpos.split():
+        k = ('%s:%d-%d[%s]' % (sg.chrom, sg.start, sg.end,
+             Strand.to_gtf(sg.strand)))
+        sgdict[k] = sg
+    assert 'chr1:100-300[+]' in sgdict
+    assert 'chr1:400-600[+]' in sgdict
