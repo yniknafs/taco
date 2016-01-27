@@ -68,6 +68,8 @@ class SpliceGraph(object):
         self.ref_stop_sites = set()
         self.start_sites = set()
         self.stop_sites = set()
+        self.node_bounds = None
+        self.G = None
 
     def _find_node_boundaries(self):
         node_bounds = set((self.start, self.end))
@@ -110,6 +112,11 @@ class SpliceGraph(object):
                 G.add_edge(u, v)
                 u = v
         return G
+
+    def choose_k(self, max_fragment_length=400):
+        for t in self.transfrags:
+            pass
+
 
     @staticmethod
     def create(transfrags,
