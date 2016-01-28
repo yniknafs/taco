@@ -350,3 +350,13 @@ def test_blah():
     a = get_data(chrom, start, end, '-')
     s_a = np.gradient(smoother(a))
     plot_slope(a, s_a)
+
+
+    chrom = 'chr16'
+    start = 19551194
+    end = 19555731
+    # ref_stop = 45108966
+    #ref_start = 40309193
+    a = get_data(chrom, start, end, '+')
+    s_a = np.gradient(smoother(a))
+    plot_slope(a, s_a)
