@@ -10,7 +10,7 @@ from taco.lib.transfrag import Transfrag
 from taco.lib.cChangePoint import find_change_points as c_find_change_points
 from taco.lib.changepoint import find_change_points
 from taco.lib.locus import Locus
-from taco.lib.splicegraph import _split_transfrag, SpliceGraph
+from taco.lib.splice_graph import split_transfrag, SpliceGraph
 
 from taco.test.base import read_gtf, read_single_locus
 
@@ -54,7 +54,7 @@ def test_ref_starts_ends():
     assert tuple(sorted(sg.ref_stop_sites)) == (200,)
 
 
-def test_split_transfrag():
+def testsplit_transfrag():
     loci = read_gtf('splice_sites.gtf')
     interval, gtf_lines = loci[0]
     t_dict = Transfrag.parse_gtf(gtf_lines)
@@ -62,16 +62,16 @@ def test_split_transfrag():
     boundaries = tuple(sg._find_node_boundaries())
     # check nodes
     t = t_dict['A']
-    nodes = tuple(_split_transfrag(t, boundaries))
+    nodes = tuple(split_transfrag(t, boundaries))
     assert nodes == ((10, 100), (200, 250), (250, 300), (400, 525))
     t = t_dict['B']
-    nodes = tuple(_split_transfrag(t, boundaries))
+    nodes = tuple(split_transfrag(t, boundaries))
     assert nodes == ((10, 100), (250, 300), (400, 525))
     t = t_dict['C']
-    nodes = tuple(_split_transfrag(t, boundaries))
+    nodes = tuple(split_transfrag(t, boundaries))
     assert nodes == ((150, 200), (200, 250), (250, 300), (400, 525))
     t = t_dict['D']
-    nodes = tuple(_split_transfrag(t, boundaries))
+    nodes = tuple(split_transfrag(t, boundaries))
     assert nodes == ((375, 400), (400, 525))
 
 

@@ -24,7 +24,13 @@ extensions = [
               include_dirs=[numpy_inc]),
     Extension('taco.lib.cChangePoint',
               sources=['taco/lib/cChangePoint.pyx'],
-              include_dirs=[numpy_inc])
+              include_dirs=[numpy_inc]),
+    Extension('taco.lib.bx.cluster',
+              sources=['taco/lib/bx/cluster.pyx',
+                       'taco/lib/bx/intervalcluster.c'],
+              include_dirs=['taco/lib/bx']),
+    Extension('taco.lib.bx.intersection',
+              sources=['taco/lib/bx/intersection.pyx'])
 ]
 
 

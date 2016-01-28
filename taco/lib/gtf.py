@@ -63,6 +63,24 @@ class GTF:
         __slots__ = ('seqid', 'source', 'feature', 'start', 'end',
                      'score', 'strand', 'phase', 'attrs')
 
+        def __init__(self):
+            pass
+
+        def __str__(self):
+            attr_str = ' '.join('%s "%s";' % (k, v)
+                                for (k, v) in self.attrs.iteritems())
+            fields = [self.seqid,
+                      self.source,
+                      self.feature,
+                      # convert to 1-based intervals
+                      str(self.start + 1),
+                      str(self.end),
+                      str(self.score),
+                      self.strand,
+                      self.phase,
+                      attr_str]
+            return '\t'.join(fields)
+
         @staticmethod
         def from_str(s):
             fields = s.strip().split('\t')
@@ -89,21 +107,6 @@ class GTF:
                     attrs[k] = v
             f.attrs = attrs
             return f
-
-        def __str__(self):
-            attr_str = ' '.join('%s "%s";' % (k, v)
-                                for (k, v) in self.attrs.iteritems())
-            fields = [self.seqid,
-                      self.source,
-                      self.feature,
-                      # convert to 1-based intervals
-                      str(self.start + 1),
-                      str(self.end),
-                      str(self.score),
-                      self.strand,
-                      self.phase,
-                      attr_str]
-            return '\t'.join(fields)
 
     @staticmethod
     def parse(line_iter):

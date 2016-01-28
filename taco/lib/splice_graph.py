@@ -34,17 +34,37 @@ def _array_subset(a, start, end):
     return a[i:j]
 
 
-def _split_transfrag(t, boundaries):
+def find_node_boundaries(transfrags,
+                         guided_ends=False,
+                         guided_assembly=False):
+    node_bounds = set()
+    min_start = None
+    max_end = None
+    for t in transfrags:
+        if t.is_ref:
+            if guided_ends:
+                node_bounds.update((t.start, t.end))
+            if guided_assembly:
+                node_bounds.update(t.itersplices())
+        else:
+            node_bounds.update(t.itersplices())
+        min_start = t.start if min_start is None else min(t.start, min_start)
+        max_end = t.end if max_end is None else max(t.end, max_end)
+    node_bounds.add(min_start)
+    node_bounds.add(max_end)
+    return sorted(node_bounds)
+
+
+def split_transfrag(t, boundaries):
     '''
-    input: transfrag
-    output: (generator) tuples (a,b) reflecting transfrag nodes
+    output: (generator) tuples (a,b) reflecting nodes
     '''
-    if t.start == t.end:
-        return
     for exon in t.exons:
         # find the indexes into the splice sites list that border the exon.
         start_ind = bisect.bisect_right(boundaries, exon.start)
         end_ind = bisect.bisect_left(boundaries, exon.end)
+
+        start_ind, end_ind
         if start_ind == end_ind:
             yield boundaries[start_ind-1], boundaries[start_ind]
         else:
@@ -100,7 +120,7 @@ class SpliceGraph(object):
             # split exons that cross boundaries and get the
             # nodes that made up the transfrag
             nodes = [Exon(a, b) for (a, b) in
-                     _split_transfrag(t, self.node_bounds)]
+                     split_transfrag(t, self.node_bounds)]
             if self.strand == Strand.NEG:
                 nodes.reverse()
             # add nodes/edges to graph
@@ -112,11 +132,6 @@ class SpliceGraph(object):
                 G.add_edge(u, v)
                 u = v
         return G
-
-    def choose_k(self, max_fragment_length=400):
-        for t in self.transfrags:
-            pass
-
 
     @staticmethod
     def create(transfrags,
@@ -180,7 +195,7 @@ class SpliceGraph(object):
         for t in self.transfrags:
             if t.is_ref and not self.guided_assembly:
                 continue
-            for n in _split_transfrag(t, self.node_bounds):
+            for n in split_transfrag(t, self.node_bounds):
                 n = Exon(*n)
                 subgraph_id = node_subgraph_map[n]
                 subgraph_transfrag_map[subgraph_id].append(t)
@@ -190,6 +205,12 @@ class SpliceGraph(object):
             yield SpliceGraph.create(subgraph_transfrags,
                                      guided_ends=self.guided_ends,
                                      guided_assembly=self.guided_assembly)
+
+    def get_transfrags(self):
+        for t in self.transfrags:
+            if t.is_ref and not self.guided_assembly:
+                continue
+            yield t
 
     def get_expr_data(self, start, end):
         assert start >= self.start

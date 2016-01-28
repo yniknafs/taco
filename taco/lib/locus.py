@@ -8,7 +8,7 @@ import h5py
 from base import Strand, TacoError
 from dtypes import FLOAT_DTYPE, H5_CHUNKSIZE
 from cBedGraph import array_to_bedgraph
-from splicegraph import SpliceGraph
+from splice_graph import SpliceGraph
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -118,11 +118,16 @@ class Locus(object):
                 self.expr_data[t.strand, astart:aend] += t.expr
                 self.strand_data[t.strand, astart:aend] = True
 
-    def create_splice_graphs(self):
+    def create_splice_graphs(self, split=True):
         for s in self.strands:
-            yield SpliceGraph.create(self.strand_transfrags[s],
-                                     guided_ends=self.guided_ends,
-                                     guided_assembly=self.guided_assembly)
+            sgraph = SpliceGraph.create(self.strand_transfrags[s],
+                                        guided_ends=self.guided_ends,
+                                        guided_assembly=self.guided_assembly)
+            if not split:
+                yield sgraph
+            else:
+                for ssubgraph in sgraph.split():
+                    yield ssubgraph
 
     def _check_strand_ambiguous(self, t):
         '''
@@ -200,10 +205,15 @@ class Locus(object):
         return self.strand_transfrags[strand]
 
     @staticmethod
-    def open_bedgraphs(file_prefix):
-        bgfilehs = []
+    def get_bedgraph_file_names(file_prefix):
         for s in (Strand.POS, Strand.NEG, Strand.NA):
             filename = '%s.%s.bedgraph' % (file_prefix, Strand.NAMES[s])
+            yield (s, filename)
+
+    @staticmethod
+    def open_bedgraphs(file_prefix):
+        bgfilehs = []
+        for s, filename in Locus.get_bedgraph_file_names(file_prefix):
             bgfilehs.append(open(filename, 'w'))
         return bgfilehs
 

@@ -13,6 +13,7 @@ import json
 import shutil
 
 from base import Sample
+from locus import Locus
 from aggregate import aggregate
 from assemble import assemble
 
@@ -36,7 +37,7 @@ class Args:
     MAX_FRAG_LENGTH = 400
     FRAC_ISOFORM = 0.01
     MAX_ISOFORMS = 100
-    OUTPUT_DIR = 'assemblyline'
+    OUTPUT_DIR = 'taco'
     RESUME = False
     PROG = 'taco'
     DESCRIPTION = 'Meta-assembly of RNA-Seq datasets'
@@ -215,6 +216,10 @@ class Results(object):
     LOCUS_STATS_FILE = 'locus_stats.txt'
     EXPR_H5_FILE = 'expression.h5'
     NODE_GTF_FILE = 'nodes.gtf'
+    BEDGRAPH_UNRESOLVED_PREFIX = 'loci.unresolved'
+    BEDGRAPH_RESOLVED_PREFIX = 'loci.resolved'
+    ASSEMBLY_GTF_FILE = 'assembly.gtf'
+    ASSEMBLY_BED_FILE = 'assembly.bed'
 
     def __init__(self, output_dir):
         self.output_dir = output_dir
@@ -234,6 +239,18 @@ class Results(object):
             os.path.join(output_dir, Results.LOCUS_STATS_FILE)
         self.expr_h5_file = os.path.join(output_dir, Results.EXPR_H5_FILE)
         self.node_gtf_file = os.path.join(output_dir, Results.NODE_GTF_FILE)
+        file_prefix = \
+            os.path.join(output_dir, Results.BEDGRAPH_UNRESOLVED_PREFIX)
+        self.unresolved_bg_files = \
+            list(Locus.get_bedgraph_file_names(file_prefix))
+        file_prefix = \
+            os.path.join(output_dir, Results.BEDGRAPH_RESOLVED_PREFIX)
+        self.resolved_bg_files = \
+            list(Locus.get_bedgraph_file_names(file_prefix))
+        self.assembly_gtf_file = \
+            os.path.join(output_dir, Results.ASSEMBLY_GTF_FILE)
+        self.assembly_bed_file = \
+            os.path.join(output_dir, Results.ASSEMBLY_BED_FILE)
 
 
 class Status(object):
@@ -333,10 +350,16 @@ class Run(object):
         a = self.args
 
         assemble(gtf_file=r.transfrags_gtf_file,
+                 unresolved_bg_files=r.unresolved_bg_files,
+                 resolved_bg_files=r.resolved_bg_files,
                  expr_h5_file=r.expr_h5_file,
                  chrom_sizes_file=r.chrom_sizes_file,
                  node_gtf_file=r.node_gtf_file,
-                 output_dir=a.output_dir,
+                 assembly_gtf_file=r.assembly_gtf_file,
+                 assembly_bed_file=r.assembly_bed_file,
+                 min_path_length=a.max_frag_length,
+                 frac_isoform=a.frac_isoform,
+                 max_isoforms=a.max_isoforms,
                  guided_strand=a.guided_strand,
                  guided_ends=a.guided_ends,
                  guided_assembly=a.guided_assembly)
