@@ -162,7 +162,7 @@ def assemble_isoforms(sgraph, min_path_length, frac_isoform, max_isoforms):
     k = choose_k(sgraph.transfrags,
                  sgraph.node_bounds,
                  min_path_length=min_path_length)
-    K, lost_paths = create_path_graph(sgraph, min_path_length)
+    K, lost_paths = create_path_graph(sgraph, k)
     # smooth kmer graph
     smooth_graph(K)
     # find up to 'max_isoforms' paths through graph
@@ -254,6 +254,8 @@ def assemble_locus(gtf_lines, config):
                        len(locus.get_transfrags(Strand.NA))))
     # write bedgraph files after strand resolved
     locus.write_bedgraph(config.resolved_bg_fhs)
+    # write splice junctions
+    locus.write_splice_bed(config.splice_bed_fh)
     # write expression array
     locus.write_expression_hdf5(config.expr_h5fh)
     # convert to stranded locus objects
@@ -273,6 +275,8 @@ def assemble(**kwargs):
     config.resolved_bg_fhs = []
     for s, filename in config.resolved_bg_files:
         config.resolved_bg_fhs.append(open(filename, 'w'))
+    # setup junction bed file
+    config.splice_bed_fh = Locus.open_splice_bed(config.splice_bed_file)
     # setup expression hdf5
     config.expr_h5fh = Locus.open_expression_hdf5(config.expr_h5_file,
                                                   config.chrom_sizes_file)
@@ -290,7 +294,7 @@ def assemble(**kwargs):
     # parse gtf file
     for interval, gtf_lines in GTF.parse_loci(open(config.gtf_file)):
         chrom, start, end = interval
-        logging.debug('Bundle %s:%d-%d: ' % (chrom, start, end))
+        logging.debug('Locus %s:%d-%d: ' % (chrom, start, end))
         assemble_locus(gtf_lines, config)
 
     # close assembly files
@@ -300,6 +304,8 @@ def assemble(**kwargs):
     config.node_gtf_fh.close()
     # close expression
     config.expr_h5fh.close()
+    # close splice junction bed file
+    config.splice_bed_fh.close()
     # close bedgraph files
     Locus.close_bedgraphs(config.unresolved_bg_fhs)
     Locus.close_bedgraphs(config.resolved_bg_fhs)

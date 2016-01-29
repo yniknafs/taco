@@ -1,0 +1,23 @@
+chr1	test	transcript	1	900	1000	+	.	transcript_id "ABCDE"; expr "1.0"
+chr1	test	exon	1	100	1000	+	.	transcript_id "ABCDE";
+chr1	test	exon	201	300	1000	+	.	transcript_id "ABCDE";
+chr1	test	exon	401	500	1000	+	.	transcript_id "ABCDE";
+chr1	test	exon	601	700	1000	+	.	transcript_id "ABCDE";
+chr1	test	exon	801	900	1000	+	.	transcript_id "ABCDE";
+
+chr1	test	transcript	1	900	1000	+	.	transcript_id "ACE"; expr "1.0"
+chr1	test	exon	1	100	1000	+	.	transcript_id "ACE";
+chr1	test	exon	401	500	1000	+	.	transcript_id "ACE";
+chr1	test	exon	801	900	1000	+	.	transcript_id "ACE";
+
+chr1	test	transcript	1	900	1000	+	.	transcript_id "ABCE"; expr "1.0"
+chr1	test	exon	1	100	1000	+	.	transcript_id "ABCE";
+chr1	test	exon	201	300	1000	+	.	transcript_id "ABCE";
+chr1	test	exon	401	500	1000	+	.	transcript_id "ABCE";
+chr1	test	exon	801	900	1000	+	.	transcript_id "ABCE";
+
+chr1	test	transcript	1	900	1000	+	.	transcript_id "ACDE"; expr "1.0"
+chr1	test	exon	1	100	1000	+	.	transcript_id "ACDE";
+chr1	test	exon	401	500	1000	+	.	transcript_id "ACDE";
+chr1	test	exon	601	700	1000	+	.	transcript_id "ACDE";
+chr1	test	exon	801	900	1000	+	.	transcript_id "ACDE";

@@ -181,22 +181,22 @@ def connect_dangling_ends(K):
         K.add_edge(u, v)
 
 
-def create_path_graph(sgraph, min_path_length):
+def get_kmers(path, k):
+    for i in xrange(0, len(path) - (k-1)):
+        yield path[i:i+k]
+
+
+def get_path(sgraph, t):
+    nodes = [Exon(*n) for n in split_transfrag(t, sgraph.node_bounds)]
+    if sgraph.strand == Strand.NEG:
+        nodes.reverse()
+    return tuple(nodes)
+
+
+def create_path_graph(sgraph, k):
     '''
     create kmer graph from partial paths
     '''
-    def get_path(t):
-        nodes = [Exon(*n) for n in split_transfrag(t, sgraph.node_bounds)]
-        if sgraph.strand == Strand.NEG:
-            nodes.reverse()
-        return tuple(nodes)
-
-    def get_kmers(path, k):
-        for i in xrange(0, len(path) - (k-1)):
-            yield path[i:i+k]
-
-    # choose value of k
-    k = choose_k(sgraph.transfrags, sgraph.node_bounds, min_path_length)
     # initialize path graph
     K = nx.DiGraph()
     K.graph['source'] = SOURCE
@@ -215,7 +215,7 @@ def create_path_graph(sgraph, min_path_length):
 
     for t in sgraph.get_transfrags():
         # get nodes
-        path = get_path(t)
+        path = get_path(sgraph, t)
         # check for start and end nodes
         is_start = (path[0] in start_nodes)
         is_end = (path[-1] in end_nodes)

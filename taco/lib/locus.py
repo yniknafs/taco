@@ -2,6 +2,7 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import logging
+import collections
 import numpy as np
 import h5py
 
@@ -230,6 +231,30 @@ class Locus(object):
                               fileh=bgfilehs[s])
 
     @staticmethod
+    def open_splice_bed(filename):
+        fh = open(filename, 'w')
+        track_line = ('track name=junctions description="Splice Junctions" '
+                      'graphType=junctions')
+        print >>fh, track_line
+        return fh
+
+    def write_splice_bed(self, fh):
+        intron_dict = collections.defaultdict(float)
+        for strand in Strand.POS, Strand.NEG:
+            for t in self.strand_transfrags[strand]:
+                if t.is_ref:
+                    continue
+                for start, end in t.iterintrons():
+                    intron_dict[(start, end, strand)] += t.expr
+        for intron, expr in intron_dict.iteritems():
+            start, end, strand = intron
+            fields = [self.chrom, str(start - 1), str(end + 1), 'JUNC',
+                      str(expr), Strand.to_gtf(strand),
+                      str(start - 1), str(end + 1), '255,0,0',
+                      '2', '1,1', '0,%d' % (end + 1 - start)]
+            print >>fh, '\t'.join(fields)
+
+    @staticmethod
     def open_expression_hdf5(filename, chrom_sizes_file):
         # read chrom sizes
         chrom_sizes = {}
@@ -244,7 +269,6 @@ class Locus(object):
             h5f.require_dataset(ref, shape=(3, length),
                                 dtype=FLOAT_DTYPE,
                                 exact=True,
-#                                    chunks=True,
                                 chunks=chunksize,
                                 compression='lzf',
                                 shuffle=True)

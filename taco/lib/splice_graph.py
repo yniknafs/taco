@@ -78,7 +78,6 @@ class SpliceGraph(object):
         self.guided_ends = False
         self.guided_assembly = False
         self.transfrags = []
-        self.G = None
         self.chrom = None
         self.start = None
         self.end = None
@@ -149,7 +148,7 @@ class SpliceGraph(object):
             if self.strand is None:
                 self.strand = t.strand
             elif self.strand != t.strand:
-                raise TacoError('chrom mismatch')
+                raise TacoError('strand mismatch')
             if self.start is None:
                 self.start = t.start
             else:

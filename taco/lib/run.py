@@ -218,6 +218,7 @@ class Results(object):
     NODE_GTF_FILE = 'nodes.gtf'
     BEDGRAPH_UNRESOLVED_PREFIX = 'loci.unresolved'
     BEDGRAPH_RESOLVED_PREFIX = 'loci.resolved'
+    SPLICE_BED_FILE = 'splice_junctions.bed'
     ASSEMBLY_GTF_FILE = 'assembly.gtf'
     ASSEMBLY_BED_FILE = 'assembly.bed'
 
@@ -247,6 +248,8 @@ class Results(object):
             os.path.join(output_dir, Results.BEDGRAPH_RESOLVED_PREFIX)
         self.resolved_bg_files = \
             list(Locus.get_bedgraph_file_names(file_prefix))
+        self.splice_bed_file = \
+            os.path.join(output_dir, Results.SPLICE_BED_FILE)
         self.assembly_gtf_file = \
             os.path.join(output_dir, Results.ASSEMBLY_GTF_FILE)
         self.assembly_bed_file = \
@@ -352,6 +355,7 @@ class Run(object):
         assemble(gtf_file=r.transfrags_gtf_file,
                  unresolved_bg_files=r.unresolved_bg_files,
                  resolved_bg_files=r.resolved_bg_files,
+                 splice_bed_file=r.splice_bed_file,
                  expr_h5_file=r.expr_h5_file,
                  chrom_sizes_file=r.chrom_sizes_file,
                  node_gtf_file=r.node_gtf_file,
