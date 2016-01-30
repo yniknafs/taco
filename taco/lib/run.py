@@ -351,7 +351,7 @@ class Run(object):
     def assemble(self):
         r = self.results
         a = self.args
-
+        
         assemble(gtf_file=r.transfrags_gtf_file,
                  unresolved_bg_files=r.unresolved_bg_files,
                  resolved_bg_files=r.resolved_bg_files,
@@ -367,6 +367,7 @@ class Run(object):
                  guided_strand=a.guided_strand,
                  guided_ends=a.guided_ends,
                  guided_assembly=a.guided_assembly)
+
         # update status and write to file
-        # self.status.assemble = True
-        # self.status.write(self.results.status_file)
+        self.status.assemble = True
+        self.status.write(self.results.status_file)
