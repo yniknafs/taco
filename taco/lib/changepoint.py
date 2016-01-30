@@ -1,7 +1,12 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
+import os
 import numpy as np
+from scipy.stats import mannwhitneyu, percentileofscore
+from taco.lib.base import TacoError, Strand
+from taco.lib.dtypes import FLOAT_DTYPE
+from taco.lib.cChangePoint import mse as mse_cython
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -12,6 +17,80 @@ __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
+def run_changepoint(a, cp_func=mse_cython):
+    s_a = np.gradient(smoother(a))
+    cps = bin_seg_slope(cp_func, a, s_a)
+    return cps
+
+def get_data(rundir, chrom, start, end, strand):
+    import h5py
+    filename = os.path.join(rundir, 'expression.h5')
+    f = h5py.File(filename, 'r')
+    if strand == '+': strand_idx = Strand.POS
+    elif strand == '-': strand_idx = Strand.NEG
+    else: strand_idx = Strand.NA
+    a = f[chrom][strand_idx, start:end]
+    return a
+
+def slope_extract(slope_a, i):
+    slope_a = np.sign(slope_a)
+    sign = slope_a[i]
+    if slope_a[i] == 0: 
+        j=0
+        k=0
+    else:
+        j=0
+        while slope_a[i-j]==slope_a[i] and (i-j)>=0: 
+            j+=1
+        k=0
+        while slope_a[i+k]==slope_a[i] and (i+k)<len(slope_a):
+            k+=1
+            if (i+k)==len(slope_a): break
+    return (j, k, sign) 
+
+def smoother(a, smooth_window="hanning", window_size = 75):
+    return smooth(a, window_len=window_size, window=smooth_window)
+
+def mwu_ediff(a, i):
+    a1 = a[:i]
+    a2 = a[i:]
+    a1 = a1[np.ediff1d(a1).nonzero()[0]]
+    a2 = a2[np.ediff1d(a2).nonzero()[0]]
+    if len(a1) == 0 or len(a2) == 0: 
+        return (999999999, 1)
+    elif (len(np.unique(a1)) == 1) and np.array_equal(np.unique(a1), np.unique(a2)):
+        return (999999999, 1)
+    else:
+        U, p = mannwhitneyu(a1, a2)
+        # p = p * len(a)
+        return (U, p)
+
+def bin_seg_slope(cp_func, a, s_a, PVAL=0.05, cps=None, offset=0, size_cutoff=20):
+    # print 'boobies', offset, offset+len(a)
+    if a.shape[0] < size_cutoff: return cps
+    if cps is None: 
+        cps = []
+    stat, i = cp_func(a)
+    U,p = mwu_ediff(a, i)
+    # print 'p:', p, 'i:', i
+    if i < 2: return cps
+    elif p < PVAL:
+        j, k, sign = slope_extract(s_a, offset+i)
+        
+        
+        if j!=0 and k!=0:
+            # print i, offset, offset+i, p, offset+i-j, offset+i+k 
+            cps.append((i + offset, p, j, k, sign))
+            #test left
+            if (offset+i-j) > offset: 
+                b1 = a[:i-j]
+                cps = bin_seg_slope(cp_func, b1, s_a, cps=cps, offset=offset)
+            #test right
+            if (offset+i+k) < offset+len(a): 
+                b2 = a[i+k:]
+                cps = bin_seg_slope(cp_func, b2, s_a, cps=cps, offset=offset + i+k)
+
+    return cps
 
 def find_change_points(a, start=0, threshold=0):
     '''
@@ -31,7 +110,6 @@ def find_change_points(a, start=0, threshold=0):
             change_points.append(start + i)
     return change_points
 
-
 def mse(x):
     change_points = (np.ediff1d(x) != 0).nonzero()[0]
     if len(change_points) == 0:
@@ -50,7 +128,6 @@ def mse(x):
             mse_min = mse
             mse_i = i
     return mse_min, mse_i
-
 
 def smooth(x, window_len=11, window='hanning'):
     """
