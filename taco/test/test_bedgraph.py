@@ -91,11 +91,11 @@ def test_performance():
             c_array_to_bedgraph(a, ref='chr1', start=0, fileh=fileh)
         os.remove(filename)
 
-    t1 = timeit.Timer(stmt1)
-    t2 = timeit.Timer(stmt2)
-    print t1.timeit(number=2)
-    print t2.timeit(number=2)
 
+    #t1 = timeit.Timer(stmt1)
+    #t2 = timeit.Timer(stmt2)
+    #print t1.timeit(number=2)
+    #print t2.timeit(number=2)
     # import pstats, cProfile
     # cProfile.runctx("stmt2()", globals(), locals(), "Profile.prof")
     # s = pstats.Stats("Profile.prof")

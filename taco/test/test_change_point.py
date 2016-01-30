@@ -1,16 +1,16 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
-import pytest
+import os
 import numpy as np
+import h5py
+import matplotlib.pyplot as plt
 
 from taco.lib.base import Strand
 from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.cChangePoint import mse as mse_cython
 from taco.lib.changepoint import mse as mse_python
-from taco.lib.changepoint import smooth
-
-import matplotlib.pyplot as plt
+from taco.lib.changepoint import smooth, run_changepoint
 
 
 def test_mse():
@@ -23,9 +23,96 @@ def test_mse():
     assert mse_i_c == 50
     assert mse_i_c == mse_i_py
     assert np.allclose(mse_min_c, mse_min_py, atol=0.01)
+    return
+
+
+def get_data(rundir, chrom, start, end, strand):
+    filename = os.path.join(rundir, 'expression.h5')
+    f = h5py.File(filename, 'r')
+    if strand == '+':
+        strand_idx = Strand.POS
+    elif strand == '-':
+        strand_idx = Strand.NEG
+    else:
+        strand_idx = Strand.NA
+    a = f[chrom][strand_idx, start:end]
+    return a
+
+
+def plot_slope(a, ref_pos=None):
+    import matplotlib.pyplot as plt
+    smooth_a = np.array(smooth(a), dtype=FLOAT_DTYPE)
+    slope_a = np.gradient(smooth_a)
+
+    plt.figure(1)
+    plt.subplot(311)
+    plt.plot(a, 'k')
+    plt.subplot(312)
+    plt.plot(smooth_a, 'g')
+
+    cps = run_changepoint(a)
+    print cps
+    for cp in cps:
+        m, p, j, k, sign = cp
+        sign = np.sign(slope_a[m])
+        color='k'
+        if sign == 1: color = 'r'
+        if sign == -1: color = 'b'
+        plt.axvline(x=m, linewidth=1, color=color)
+        for ref in ref_pos:
+            plt.axvline(x=ref, linewidth=1, color='m')
+    plt.subplot(313)
+    plt.plot(slope_a, 'g')
+    for cp in cps:
+        m, p, j, k, sign = cp
+        plt.axvline(x=m-j, linewidth=1, color='y')
+        plt.axvline(x=m+k, linewidth=1, color='y')
+
+    plt.show()
+
+
+def test_blah():
+    tests = [
+        ('chr17', 40283388, 40287603, '+'),
+        ('chr18', 31042592, 31068212, '-'),
+        ('chr17', 40301912, 40314155, '+'),
+        ('chr12', 53996031, 54000718, '-'),
+        ('chr12', 55992235, 55997163, '+'),
+        ('chr12', 56101529, 56104825, '+'),
+        ('chr12', 56315821, 56317643, '-'),
+        ('chr16', 19551194, 19555731, '+'),
+        ('chr18', 31545721, 31550507, '+'),
+        ('chr18', 31621550, 31625761, '-'),
+        ('chr18', 31630959, 31631146, '-'),
+        ('chr18', 31826338, 31830989, '-'),
+        ('chr18', 32287031, 32288203, '-'),
+        ('chr18', 32089621, 32092235, '+'),
+    ]
+
+    def tester(tup, ref):
+        chrom, start, end, strand = tup
+        rundir = '/Users/mkiyer/Documents/lab/projects/taco/ccle/ccle55_stringtie_changept'
+        a = get_data(rundir, chrom, start, end, strand)
+        print chrom, start, end
+        ref_i = []
+        for r in ref:
+            ref_i.append(r - start)
+        plot_slope(a, ref_i)
+
+    # for test in tests:
+    #     tester(test)
+
+    # tester(('chr1',11936,14829,'-'), [14403])
+    # tester(('chr1',183489,184971,'-'), [184922, 184924, 184926])
+    # tester(('chr1',910143,917720,'-'), [916869])
+    # tester(('chr1',9268168,9271563,'+'), [9271337])
+    # tester(('chr1',781937,793041,'+'), [])
+    # tester(('chr1',778769,787810,'+'), [])
+    tester(('chr1',11936, 14829, '-'), [])
 
 
 def test_smooth():
+    return
     a = np.zeros(1000)
     a[:200] = 100
     a[200:300] = np.linspace(100, 0, num=100)
@@ -34,7 +121,6 @@ def test_smooth():
     a[600:700] = np.linspace(0, 500, num=100)
     a[700:] = 500
     a += 50 * np.random.random(1000)
-
 
     for wsize in xrange(11, 101):
         y = smooth(a, window_len=52, window='hanning')
@@ -63,16 +149,6 @@ def test_smooth():
 
 
 
-def get_data1():
-    import h5py
-    filename = '/Users/mkiyer/Documents/lab/projects/taco/ccle/run1/expression.h5'
-    f = h5py.File(filename, 'r')
-    chrom = 'chr17'
-    start = 40283388
-    end = 40287603
-    ref_stop = 40284136
-    a = f[chrom][Strand.POS, start:end]
-    return a
 
 
 def permute(a, nperms=10):
@@ -173,48 +249,3 @@ def plot_cusum(a, ref_pos=None):
         plt.axvline(x=ref_pos, linewidth=1, color='g', linestyle='--')
 
     plt.show()
-
-# def test_blah():
-#     import h5py
-#     filename = '/Users/mkiyer/Documents/lab/projects/taco/ccle/run1/expression.h5'
-#     f = h5py.File(filename, 'r')
-#
-#     chrom = 'chr17'
-#     start = 40283388
-#     end = 40287603
-#     ref_stop = 40284136
-#     a = f[chrom][Strand.POS, start:end]
-#     print cusum(a)
-#     print mse(a)
-#     plot_cusum(a, ref_pos=ref_stop - start)
-#
-#     chrom = 'chr17'
-#     start = 40301912
-#     end = 40314155
-#     ref_stop = 40304657
-#     ref_start = 40309193
-#     a = f[chrom][Strand.POS, start:end]
-#     print cusum(a)
-#     print mse(a)
-#     plot_cusum(a, ref_pos=ref_stop - start)
-#
-#     chrom = 'chr17'
-#     start = 45101380
-#     end = 45112704
-#     ref_stop = 45108966
-#     #ref_start = 40309193
-#     a = f[chrom][Strand.NEG, start:end]
-#     print cusum(a)
-#     print mse(a)
-#     plot_cusum(a, ref_pos=ref_stop - start)
-
-# def test_cusum2():
-#     a = np.zeros(1000)
-#     a[:200] = 100
-#     a[200:300] = np.linspace(100, 0, num=100)
-#     a[20] = 8
-#     a[40] = 8
-#     a[600:700] = np.linspace(0, 500, num=100)
-#     a[700:] = 500
-#     a += 50 * np.random.random(1000)
-#     # plot_cusum(a)

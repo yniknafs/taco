@@ -4,13 +4,13 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 import pytest
 import numpy as np
 
-from taco.lib.base import TacoError, Strand
+from taco.lib.base import TacoError, Strand, Exon
 from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.transfrag import Transfrag
 from taco.lib.cChangePoint import find_change_points as c_find_change_points
 from taco.lib.changepoint import find_change_points
 from taco.lib.locus import Locus
-from taco.lib.splice_graph import split_transfrag, SpliceGraph
+from taco.lib.splice_graph import split_transfrag, SpliceGraph, Node
 
 from taco.test.base import read_gtf, read_single_locus
 
@@ -48,13 +48,137 @@ def test_find_node_boundaries():
 
 
 def test_ref_starts_ends():
-    t_dict, locus = read_single_locus('change_point.gtf')
+    t_dict, locus = read_single_locus('change_point1.gtf')
     sg = SpliceGraph.create(t_dict.values())
     assert tuple(sorted(sg.ref_start_sites)) == (95,)
     assert tuple(sorted(sg.ref_stop_sites)) == (200,)
 
 
-def testsplit_transfrag():
+def test_mark_start_stop_sites1():
+    t_dict, locus = read_single_locus('change_point1.gtf')
+    sgraph = SpliceGraph.create(t_dict.values())
+    G = sgraph.G
+    assert len(G) == 1
+    n = Exon(50, 200)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and nd[Node.IS_STOP]
+    # add a start site change point
+    sgraph.start_sites.add(125)
+    sgraph.recreate_graph()
+    G = sgraph.G
+    assert len(G) == 2
+    n = Exon(50, 125)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and not nd[Node.IS_STOP]
+    n = Exon(125, 200)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and nd[Node.IS_STOP]
+    # add a stop site change point
+    sgraph.stop_sites.add(80)
+    sgraph.recreate_graph()
+    G = sgraph.G
+    assert len(G) == 3
+    n = Exon(50, 80)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and nd[Node.IS_STOP]
+    n = Exon(80, 125)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert not nd[Node.IS_START] and not nd[Node.IS_STOP]
+    n = Exon(125, 200)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and nd[Node.IS_STOP]
+
+    # flip strand
+    for t_id, t in t_dict.iteritems():
+        t.strand = Strand.NEG
+    sgraph = SpliceGraph.create(t_dict.values())
+    G = sgraph.G
+    assert len(G) == 1
+    n = Exon(50, 200)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and nd[Node.IS_STOP]
+    # add a start site change point
+    sgraph.start_sites.add(125)
+    sgraph.recreate_graph()
+    G = sgraph.G
+    assert len(G) == 2
+    n = Exon(50, 125)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and nd[Node.IS_STOP]
+    n = Exon(125, 200)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and not nd[Node.IS_STOP]
+    # add a stop site change point
+    sgraph.stop_sites.add(80)
+    sgraph.recreate_graph()
+    G = sgraph.G
+    assert len(G) == 3
+    n = Exon(50, 80)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert not nd[Node.IS_START] and nd[Node.IS_STOP]
+    n = Exon(80, 125)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and nd[Node.IS_STOP]
+    n = Exon(125, 200)
+    assert n in G
+    nd = sgraph.G.node[n]
+    assert nd[Node.IS_START] and not nd[Node.IS_STOP]
+
+
+def test_mark_start_stop_sites2():
+    # pos strand not guided
+    t_dict, locus = read_single_locus('multi_strand1.gtf')
+    sgraph = SpliceGraph.create(locus.get_transfrags(Strand.POS))
+    G = sgraph.G
+    assert G.node[Exon(100, 200)][Node.IS_START]
+    assert G.node[Exon(400, 650)][Node.IS_STOP]
+
+    # neg strand not guided
+    sgraph = SpliceGraph.create(locus.get_transfrags(Strand.NEG))
+    G = sgraph.G
+    assert G.node[Exon(950, 980)][Node.IS_START]
+    assert G.node[Exon(400, 500)][Node.IS_STOP]
+
+    # pos strand guided
+    sgraph = SpliceGraph.create(locus.get_transfrags(Strand.POS),
+                                guided_ends=True,
+                                guided_assembly=True)
+    G = sgraph.G
+    assert G.node[Exon(100, 150)][Node.IS_START]
+    assert G.node[Exon(150, 200)][Node.IS_START]
+    assert G.node[Exon(500, 600)][Node.IS_STOP]
+    assert G.node[Exon(600, 650)][Node.IS_STOP]
+    assert G.node[Exon(150, 200)][Node.IS_REF]
+    assert G.node[Exon(300, 400)][Node.IS_REF]
+    assert G.node[Exon(500, 600)][Node.IS_REF]
+    assert not G.node[Exon(100, 150)][Node.IS_REF]
+    assert not G.node[Exon(600, 650)][Node.IS_REF]
+
+    # neg strand guided
+    sgraph = SpliceGraph.create(locus.get_transfrags(Strand.NEG),
+                                guided_ends=True,
+                                guided_assembly=True)
+    G = sgraph.G
+    assert G.node[Exon(350, 400)][Node.IS_STOP]
+    assert G.node[Exon(980, 1000)][Node.IS_START]
+    assert not G.node[Exon(950, 980)][Node.IS_START]
+    for n, nd in G.nodes_iter(data=True):
+        assert nd[Node.IS_REF]
+    return
+
+
+def test_split_transfrag():
     loci = read_gtf('splice_sites.gtf')
     interval, gtf_lines = loci[0]
     t_dict = Transfrag.parse_gtf(gtf_lines)

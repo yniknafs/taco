@@ -1,0 +1,8 @@
+chr1	test	transcript	1	100	0	+	.	transcript_id "A"; expr "1.0"
+chr1	test	exon	1	100	0	+	.	transcript_id "A"
+
+chr1	test	transcript	1	50	0	+	.	transcript_id "A1"; expr "10.0"
+chr1	test	exon	1	50	0	+	.	transcript_id "A1"
+
+chr1	test	transcript	51	100	0	+	.	transcript_id "A2"; expr "1.0"
+chr1	test	exon	51	100	0	+	.	transcript_id "A2"

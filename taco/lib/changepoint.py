@@ -2,11 +2,14 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import os
+
+import h5py
 import numpy as np
-from scipy.stats import mannwhitneyu, percentileofscore
-from taco.lib.base import TacoError, Strand
-from taco.lib.dtypes import FLOAT_DTYPE
+from scipy.stats import mannwhitneyu
+
+from taco.lib.base import Strand, TacoError
 from taco.lib.cChangePoint import mse as mse_cython
+
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -17,80 +20,112 @@ __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
-def run_changepoint(a, cp_func=mse_cython):
-    s_a = np.gradient(smoother(a))
-    cps = bin_seg_slope(cp_func, a, s_a)
+
+def run_changepoint(a, size_cutoff=20, cp_func=mse_cython,
+                    smooth_window="hanning", window_len=75):
+    '''
+    a: array with expression data
+    size_cutoff: minimum length of interval to allow recursive change point
+                 searches
+    cp_func: distance function to compute change point location
+    smooth_window: numpy smoothing window type
+    window_len: size of smoothing window
+
+    returns list of changepoints where each is a tuple (i, p, j, k, sign)
+        i: index of change point within array 'a'
+        p: p-value of change point (mannwhitneyu)
+        j: distance from i to left slope boundary
+        k: distance from i to right slope boundary
+        sign: direction of change
+    '''
+    if a.shape[0] < window_len:
+        return []
+    s_a = np.gradient(smooth(a, window_len=window_len, window=smooth_window))
+    cps = bin_seg_slope(a, s_a, cp_func, size_cutoff=size_cutoff)
     return cps
 
+
 def get_data(rundir, chrom, start, end, strand):
-    import h5py
     filename = os.path.join(rundir, 'expression.h5')
     f = h5py.File(filename, 'r')
-    if strand == '+': strand_idx = Strand.POS
-    elif strand == '-': strand_idx = Strand.NEG
-    else: strand_idx = Strand.NA
+    if strand == '+':
+        strand_idx = Strand.POS
+    elif strand == '-':
+        strand_idx = Strand.NEG
+    else:
+        strand_idx = Strand.NA
     a = f[chrom][strand_idx, start:end]
     return a
+
 
 def slope_extract(slope_a, i):
     slope_a = np.sign(slope_a)
     sign = slope_a[i]
-    if slope_a[i] == 0: 
-        j=0
-        k=0
+    if slope_a[i] == 0:
+        j = 0
+        k = 0
     else:
-        j=0
-        while slope_a[i-j]==slope_a[i] and (i-j)>=0: 
-            j+=1
-        k=0
-        while slope_a[i+k]==slope_a[i] and (i+k)<len(slope_a):
-            k+=1
-            if (i+k)==len(slope_a): break
-    return (j, k, sign) 
+        j = 0
+        while (i - j) >= 0 and slope_a[i - j] == slope_a[i]:
+            j += 1
+        k = 0
+        while (i + k) < len(slope_a) and slope_a[i + k] == slope_a[i]:
+            k += 1
+    return (j, k, sign)
 
-def smoother(a, smooth_window="hanning", window_size = 75):
-    return smooth(a, window_len=window_size, window=smooth_window)
 
 def mwu_ediff(a, i):
     a1 = a[:i]
     a2 = a[i:]
     a1 = a1[np.ediff1d(a1).nonzero()[0]]
     a2 = a2[np.ediff1d(a2).nonzero()[0]]
-    if len(a1) == 0 or len(a2) == 0: 
-        return (999999999, 1)
-    elif (len(np.unique(a1)) == 1) and np.array_equal(np.unique(a1), np.unique(a2)):
-        return (999999999, 1)
+    if len(a1) == 0 or len(a2) == 0:
+        return (None, 1)
+    elif (len(np.unique(a1)) == 1 and
+          np.array_equal(np.unique(a1), np.unique(a2))):
+        return (None, 1)
     else:
         U, p = mannwhitneyu(a1, a2)
-        # p = p * len(a)
         return (U, p)
 
-def bin_seg_slope(cp_func, a, s_a, PVAL=0.05, cps=None, offset=0, size_cutoff=20):
-    # print 'boobies', offset, offset+len(a)
-    if a.shape[0] < size_cutoff: return cps
-    if cps is None: 
+
+def bin_seg_slope(a, s_a, cp_func=mse_cython, PVAL=0.05, cps=None, offset=0,
+                  size_cutoff=20):
+    '''
+    a: expr data vector
+    s_a: slope vector
+    cp_func: function to choose change point
+    PVAL: threshold to call change points
+    cps: (recursion) list of change points
+    offset: (recursion) offset into vectors
+    size_cutoff: stop searching for change points when vector
+                 length < size_cutoff
+    '''
+    if a.shape[0] < size_cutoff:
+        return cps
+    if cps is None:
         cps = []
     stat, i = cp_func(a)
-    U,p = mwu_ediff(a, i)
-    # print 'p:', p, 'i:', i
-    if i < 2: return cps
+    U, p = mwu_ediff(a, i)
+    if i <= 1:
+        return cps
     elif p < PVAL:
-        j, k, sign = slope_extract(s_a, offset+i)
-        
-        
-        if j!=0 and k!=0:
-            # print i, offset, offset+i, p, offset+i-j, offset+i+k 
+        j, k, sign = slope_extract(s_a, offset + i)
+        if j != 0 and k != 0:
+            # save changepoint
+            print 'CHANGE', i, p, j, k, sign
             cps.append((i + offset, p, j, k, sign))
-            #test left
-            if (offset+i-j) > offset: 
+            # test left
+            if (offset+i-j) > offset:
                 b1 = a[:i-j]
-                cps = bin_seg_slope(cp_func, b1, s_a, cps=cps, offset=offset)
-            #test right
-            if (offset+i+k) < offset+len(a): 
+                cps = bin_seg_slope(b1, s_a, cp_func, cps=cps, offset=offset)
+            # test right
+            if (offset+i+k) < offset+len(a):
                 b2 = a[i+k:]
-                cps = bin_seg_slope(cp_func, b2, s_a, cps=cps, offset=offset + i+k)
-
+                cps = bin_seg_slope(b2, s_a, cp_func, cps=cps,
+                                    offset=(offset + i + k))
     return cps
+
 
 def find_change_points(a, start=0, threshold=0):
     '''
@@ -110,8 +145,9 @@ def find_change_points(a, start=0, threshold=0):
             change_points.append(start + i)
     return change_points
 
+
 def mse(x):
-    change_points = (np.ediff1d(x) != 0).nonzero()[0]
+    change_points = (np.ediff1d(x) != 0).nonzero()[0] + 1
     if len(change_points) == 0:
         return 0.0, -1
 
@@ -128,6 +164,7 @@ def mse(x):
             mse_min = mse
             mse_i = i
     return mse_min, mse_i
+
 
 def smooth(x, window_len=11, window='hanning'):
     """

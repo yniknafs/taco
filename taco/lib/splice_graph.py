@@ -1,6 +1,7 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
+import logging
 import collections
 import bisect
 import networkx as nx
@@ -10,6 +11,7 @@ from base import Exon, Strand, TacoError
 from gtf import GTF
 from dtypes import FLOAT_DTYPE
 from cChangePoint import find_change_points
+from changepoint import run_changepoint
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -19,6 +21,13 @@ __version__ = "0.4.0"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
+
+
+# graph node attributes
+class Node:
+    IS_START = 'is_start'
+    IS_STOP = 'is_stop'
+    IS_REF = 'is_ref'
 
 
 def _array_subset(a, start, end):
@@ -34,27 +43,6 @@ def _array_subset(a, start, end):
     return a[i:j]
 
 
-def find_node_boundaries(transfrags,
-                         guided_ends=False,
-                         guided_assembly=False):
-    node_bounds = set()
-    min_start = None
-    max_end = None
-    for t in transfrags:
-        if t.is_ref:
-            if guided_ends:
-                node_bounds.update((t.start, t.end))
-            if guided_assembly:
-                node_bounds.update(t.itersplices())
-        else:
-            node_bounds.update(t.itersplices())
-        min_start = t.start if min_start is None else min(t.start, min_start)
-        max_end = t.end if max_end is None else max(t.end, max_end)
-    node_bounds.add(min_start)
-    node_bounds.add(max_end)
-    return sorted(node_bounds)
-
-
 def split_transfrag(t, boundaries):
     '''
     output: (generator) tuples (a,b) reflecting nodes
@@ -63,8 +51,6 @@ def split_transfrag(t, boundaries):
         # find the indexes into the splice sites list that border the exon.
         start_ind = bisect.bisect_right(boundaries, exon.start)
         end_ind = bisect.bisect_left(boundaries, exon.end)
-
-        start_ind, end_ind
         if start_ind == end_ind:
             yield boundaries[start_ind-1], boundaries[start_ind]
         else:
@@ -92,6 +78,8 @@ class SpliceGraph(object):
 
     def _find_node_boundaries(self):
         node_bounds = set((self.start, self.end))
+        node_bounds.update(self.start_sites)
+        node_bounds.update(self.stop_sites)
         # nodes bounded by regions where expression changes to/from zero
         zero_points = find_change_points(self.expr_data, start=self.start)
         node_bounds.update(zero_points)
@@ -106,11 +94,50 @@ class SpliceGraph(object):
                 node_bounds.update(t.itersplices())
         return sorted(node_bounds)
 
+    def _mark_start_stop_nodes(self):
+        G = self.G
+        # get all leaf nodes
+        for n, nd in G.nodes_iter(data=True):
+            if G.in_degree(n) == 0:
+                nd[Node.IS_START] = True
+            if G.out_degree(n) == 0:
+                nd[Node.IS_STOP] = True
+        # mark change points
+        change_points = set()
+        change_points.update(set((Node.IS_START, x) for x in self.start_sites))
+        change_points.update(set((Node.IS_STOP, x) for x in self.stop_sites))
+        if self.guided_ends:
+            change_points.update((Node.IS_START, x)
+                                 for x in self.ref_start_sites)
+            change_points.update((Node.IS_STOP, x)
+                                 for x in self.ref_stop_sites)
+        node_bounds = self.node_bounds
+
+        strand = self.strand
+        for direction, pos in change_points:
+            if ((direction == Node.IS_STOP and strand == Strand.NEG) or
+                (direction == Node.IS_START and strand != Strand.NEG)):
+                bisect_func = bisect.bisect_right
+            else:
+                bisect_func = bisect.bisect_left
+            i = bisect_func(node_bounds, pos)
+            n = (node_bounds[i-1], node_bounds[i])
+            assert n in G
+            G.node[n][direction] = True
+
     def _create_splice_graph(self):
         '''returns networkx DiGraph object'''
-        def add_node(G, n):
+
+        def init_node_attrs():
+            return {Node.IS_START: False,
+                    Node.IS_STOP: False,
+                    Node.IS_REF: False}
+
+        def add_node(G, n, is_ref=False):
             if n not in G:
-                G.add_node(n, length=(n.end - n.start), expr=None)
+                G.add_node(n, attr_dict=init_node_attrs())
+            if is_ref:
+                G.node[n][Node.IS_REF] = True
 
         G = nx.DiGraph()
         for t in self.transfrags:
@@ -124,10 +151,10 @@ class SpliceGraph(object):
                 nodes.reverse()
             # add nodes/edges to graph
             u = nodes[0]
-            add_node(G, u)
+            add_node(G, u, is_ref=t.is_ref)
             for i in xrange(1, len(nodes)):
                 v = nodes[i]
-                add_node(G, v)
+                add_node(G, v, is_ref=t.is_ref)
                 G.add_edge(u, v)
                 u = v
         return G
@@ -174,7 +201,34 @@ class SpliceGraph(object):
 
         self.node_bounds = self._find_node_boundaries()
         self.G = self._create_splice_graph()
+        self._mark_start_stop_nodes()
         return self
+
+    def detect_change_points(self):
+        for node in self.G:
+            expr_data = self.get_expr_data(node.start, node.end)
+            changepts = run_changepoint(expr_data)
+            # add start and stop sites
+            for changept, pvalue, slope_left, slope_right, sign in changepts:
+                m = ('%s:%d(%d-%d)[%s] node(%d-%d) sign=%f pvalue=%f' %
+                     (self.chrom,
+                      node.start + changept,
+                      node.start + changept - slope_left,
+                      node.start + changept + slope_right,
+                      Strand.to_gtf(self.strand),
+                      node.start, node.end,
+                      sign, pvalue))
+                logging.debug('Change Point: ' + m)
+                if ((self.strand == Strand.POS and sign < 0) or
+                    (self.strand == Strand.NEG and sign > 0)):
+                    self.stop_sites.add(node.start + changept)
+                else:
+                    self.start_sites.add(node.start + changept)
+
+    def recreate_graph(self):
+        self.node_bounds = self._find_node_boundaries()
+        self.G = self._create_splice_graph()
+        self._mark_start_stop_nodes()
 
     def split(self):
         '''splits into weakly connected component subgraphs'''
@@ -211,6 +265,16 @@ class SpliceGraph(object):
                 continue
             yield t
 
+    def get_start_stop_nodes(self):
+        start_nodes = set()
+        stop_nodes = set()
+        for n, nd in self.G.nodes_iter(data=True):
+            if nd[Node.IS_START]:
+                start_nodes.add(n)
+            if nd[Node.IS_STOP]:
+                stop_nodes.add(n)
+        return start_nodes, stop_nodes
+
     def get_expr_data(self, start, end):
         assert start >= self.start
         assert end <= self.end
@@ -227,7 +291,7 @@ class SpliceGraph(object):
                     (self.chrom, self.start, self.end,
                      Strand.to_gtf(self.strand)))
         # iterate through locus and return change point data
-        for n in sorted(self.G):
+        for n in self.G:
             expr_data = self.get_expr_data(*n)
             ref_starts = _array_subset(self.ref_start_sites, *n)
             ref_stops = _array_subset(self.ref_stop_sites, *n)

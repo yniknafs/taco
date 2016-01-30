@@ -64,25 +64,9 @@ def smooth_graph(G, expr_attr=NODE_EXPR):
         d[expr_attr] += d[SMOOTH_TMP]
 
 
-def init_node_attrs():
-    return {NODE_EXPR: 0.0, SMOOTH_FWD: 0.0,
-            SMOOTH_REV: 0.0, SMOOTH_TMP: 0.0}
-
-
-def get_start_end_nodes(G):
-    # get all leaf nodes
-    start_nodes = set()
-    end_nodes = set()
-    for n in G.nodes_iter():
-        if G.in_degree(n) == 0:
-            start_nodes.add(n)
-        if G.out_degree(n) == 0:
-            end_nodes.add(n)
-    return start_nodes, end_nodes
-
-
-def choose_k(transfrags, node_bounds, min_path_length=400):
-    k = 0
+def choose_k(transfrags, node_bounds, min_path_length=400, kmin=2):
+    assert kmin > 0
+    k = 1
     for t in transfrags:
         node_lengths = [(n[1] - n[0]) for n in split_transfrag(t, node_bounds)]
         # initialize
@@ -92,18 +76,22 @@ def choose_k(transfrags, node_bounds, min_path_length=400):
         j = 0
         while i < len(node_lengths):
             while j < len(node_lengths):
-                if path_length >= min_path_length:
+                if (path_length >= min_path_length) and ((j - i) >= kmin):
                     break
                 path_length += node_lengths[j]
                 j += 1
             path_k = max(path_k, (j - i))
-
             if j == len(node_lengths):
                 break
             path_length -= node_lengths[i]
             i += 1
         k = max(k, path_k)
     return k
+
+
+def init_node_attrs():
+    return {NODE_EXPR: 0.0, SMOOTH_FWD: 0.0,
+            SMOOTH_REV: 0.0, SMOOTH_TMP: 0.0}
 
 
 def add_path(K, path, expr):
@@ -194,9 +182,7 @@ def get_path(sgraph, t):
 
 
 def create_path_graph(sgraph, k):
-    '''
-    create kmer graph from partial paths
-    '''
+    '''create kmer graph from partial paths'''
     # initialize path graph
     K = nx.DiGraph()
     K.graph['source'] = SOURCE
@@ -204,30 +190,28 @@ def create_path_graph(sgraph, k):
     K.add_node(SOURCE, attr_dict=init_node_attrs())
     K.add_node(SINK, attr_dict=init_node_attrs())
     # find all beginning/end nodes in splice graph
-    start_nodes, end_nodes = get_start_end_nodes(sgraph.G)
-    # convert paths to k-mers and create a k-mer to
-    # integer node map
+    start_nodes, stop_nodes = sgraph.get_start_stop_nodes()
+    # convert paths to k-mers and create a k-mer to integer node map
     kmer_id_map = {}
     id_kmer_map = {}
     kmer_paths = []
     current_id = 0
     short_partial_path_dict = collections.defaultdict(lambda: [])
-
     for t in sgraph.get_transfrags():
         # get nodes
         path = get_path(sgraph, t)
-        # check for start and end nodes
+        # check for start and stop nodes
         is_start = (path[0] in start_nodes)
-        is_end = (path[-1] in end_nodes)
+        is_end = (path[-1] in stop_nodes)
         full_length = is_start and is_end
         if (len(path) < k) and (not full_length):
             # save fragmented short paths
             short_partial_path_dict[len(path)].append((path, t.expr))
             continue
         # convert to path of kmers
-        kmerpath = []
+        kmer_path = []
         if is_start:
-            kmerpath.append(SOURCE)
+            kmer_path.append(SOURCE)
         if len(path) < k:
             # specially add short full length paths because
             # they are not long enough to have kmers
@@ -243,10 +227,10 @@ def create_path_graph(sgraph, k):
                 current_id += 1
             else:
                 kmer_id = kmer_id_map[kmer]
-            kmerpath.append(kmer_id)
+            kmer_path.append(kmer_id)
         if is_end:
-            kmerpath.append(SINK)
-        kmer_paths.append((kmerpath, t.expr))
+            kmer_path.append(SINK)
+        kmer_paths.append((kmer_path, t.expr))
     # store mapping from kmer_id to subpath tuple
     K.graph['id_kmer_map'] = id_kmer_map
     for path, expr in kmer_paths:

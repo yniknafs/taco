@@ -183,6 +183,12 @@ def assemble_isoforms(sgraph, min_path_length, frac_isoform, max_isoforms):
 
 
 def assemble_gene(sgraph, locus_id_str, config):
+    # output node data for change point analysis
+    for f in sgraph.get_node_gtf():
+        print >>config.node_gtf_fh, str(f)
+    # detect change points
+    sgraph.detect_change_points()
+    sgraph.recreate_graph()
     # run isoform path finding algorithm
     isoforms = assemble_isoforms(sgraph, config.min_path_length,
                                  config.frac_isoform, config.max_isoforms)
@@ -261,8 +267,6 @@ def assemble_locus(gtf_lines, config):
     # convert to stranded locus objects
     locus_id_str = "L%d" % (config.locus_id_value_obj.next())
     for sgraph in locus.create_splice_graphs():
-        for f in sgraph.get_node_gtf():
-            print >>config.node_gtf_fh, str(f)
         assemble_gene(sgraph, locus_id_str, config)
 
 
