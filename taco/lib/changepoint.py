@@ -113,7 +113,6 @@ def bin_seg_slope(a, s_a, cp_func=mse_cython, PVAL=0.05, cps=None, offset=0,
         j, k, sign = slope_extract(s_a, offset + i)
         if j != 0 and k != 0:
             # save changepoint
-            print 'CHANGE', i, p, j, k, sign
             cps.append((i + offset, p, j, k, sign))
             # test left
             if (offset+i-j) > offset:

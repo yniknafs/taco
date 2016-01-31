@@ -39,8 +39,8 @@ def which(program):
     return None
 
 
-def prepare_igvtools_gtf(igvtools, infile):
-    outfile = os.path.splitext(infile)[0] + '.srt.gtf'
+def prepare_igvtools(igvtools, infile, ext='gtf'):
+    outfile = os.path.splitext(infile)[0] + '.srt.' + ext
     logging.info('igvtools sort %s -> %s' % (infile, outfile))
     subprocess.call([igvtools, 'sort', infile, outfile])
     logging.info('igvtools index %s' % (outfile))
@@ -92,8 +92,9 @@ def main():
         subprocess.call([bedGraphToBigWig, infile, r.chrom_sizes_file,
                          outfile])
 
-    prepare_igvtools_gtf(igvtools, r.node_gtf_file)
-    prepare_igvtools_gtf(igvtools, r.assembly_gtf_file)
+    prepare_igvtools(igvtools, r.node_gtf_file, ext='gtf')
+    prepare_igvtools(igvtools, r.assembly_gtf_file, ext='gtf')
+    prepare_igvtools(igvtools, r.splice_bed_file, ext='bed')
 
 
 if __name__ == '__main__':

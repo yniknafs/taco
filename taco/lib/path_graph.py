@@ -142,7 +142,10 @@ def find_short_path_kmers(kmer_hash, K, path, expr):
         matching_kmers.append((kmer_id, kmer_expr))
     # now calculate fractional densities for matching kmers
     for kmer_id, kmer_expr in matching_kmers:
-        new_expr = expr * (kmer_expr / float(total_expr))
+        if total_expr == 0:
+            new_expr = expr / len(matching_kmers)
+        else:
+            new_expr = expr * (kmer_expr / total_expr)
         yield ([kmer_id], new_expr)
 
 

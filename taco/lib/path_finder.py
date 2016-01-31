@@ -139,16 +139,18 @@ def find_suboptimal_paths(G, source, sink, fraction_major_path=1e-3,
     # setup temporary graph attributes
     init_tmp_attributes(G)
     # store paths in a dictionary in order to avoid redundant paths
-    # that arise when the heuristic assumptions of the algorithm fail
+    # that arise if the heuristic assumptions of the algorithm fail
     path_results = collections.OrderedDict()
-    # find highest score path
+    # define threshold score to stop producing suboptimal paths
+    lowest_score = G.node[source][NODE_EXPR] * fraction_major_path
+    lowest_score = max(MIN_SCORE, lowest_score)
+    # find highest scoring path
     path, score = find_path(G, source, sink)
     path_results[path] = score
     subtract_path(G, path, score)
+    highest_score = score
     # iterate to find suboptimal paths
     iterations = 1
-    highest_score = score
-    lowest_score = max(MIN_SCORE, highest_score * fraction_major_path)
     while iterations < max_paths:
         # find path
         path, score = find_path(G, source, sink)

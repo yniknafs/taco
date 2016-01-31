@@ -10,7 +10,7 @@ from base import Strand
 from transfrag import Transfrag
 from locus import Locus
 from path_graph import choose_k, create_path_graph, smooth_graph, \
-    reconstruct_path
+    reconstruct_path, NODE_EXPR
 from path_finder import find_suboptimal_paths
 from bx.cluster import ClusterTree
 
@@ -162,13 +162,19 @@ def assemble_isoforms(sgraph, min_path_length, frac_isoform, max_isoforms):
     k = choose_k(sgraph.transfrags,
                  sgraph.node_bounds,
                  min_path_length=min_path_length)
+    logging.debug('%s:%d-%d[%s] nodes=%d' %
+                  (sgraph.chrom, sgraph.start, sgraph.end,
+                   Strand.to_gtf(sgraph.strand), len(sgraph.G)))
     K, lost_paths = create_path_graph(sgraph, k)
     # smooth kmer graph
     smooth_graph(K)
     # find up to 'max_isoforms' paths through graph
-    logging.debug('%s:%d-%d[%s] finding paths in k=%d graph (%d nodes)' %
+    source_node = K.graph['source']
+    logging.debug('%s:%d-%d[%s] finding paths in k=%d graph '
+                  '(%d nodes) source_expr=%f' %
                   (sgraph.chrom, sgraph.start, sgraph.end,
-                   Strand.to_gtf(sgraph.strand), k, len(K)))
+                   Strand.to_gtf(sgraph.strand), k, len(K),
+                   K.node[source_node][NODE_EXPR]))
     isoforms = []
     id_kmer_map = K.graph['id_kmer_map']
     for kmer_path, expr in \
