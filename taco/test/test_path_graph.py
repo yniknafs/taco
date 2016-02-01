@@ -157,7 +157,7 @@ def test_path_graph2():
 
     # add a stop site
     sgraph.stop_sites.add(50)
-    sgraph.recreate_graph()
+    sgraph.recreate()
     K, lost_paths = create_path_graph(sgraph, k=2)
     assert len(lost_paths) == 0
     kmer_id_map = dict((v, k) for k, v in K.graph['id_kmer_map'].iteritems())
@@ -177,7 +177,7 @@ def test_path_graph2():
     # add both a start and a stop site
     sgraph.start_sites.add(50)
     sgraph.stop_sites.add(50)
-    sgraph.recreate_graph()
+    sgraph.recreate()
     K, lost_paths = create_path_graph(sgraph, k=2)
     smooth_graph(K)
     kmer_id_map = dict((v, k) for k, v in K.graph['id_kmer_map'].iteritems())

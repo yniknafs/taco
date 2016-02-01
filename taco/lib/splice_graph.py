@@ -10,8 +10,9 @@ import numpy as np
 from base import Exon, Strand, TacoError
 from gtf import GTF
 from dtypes import FLOAT_DTYPE
-from cChangePoint import find_change_points
+from cChangePoint import find_threshold_points
 from changepoint import run_changepoint
+from bx.intersection import Interval, IntervalTree
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -68,21 +69,82 @@ class SpliceGraph(object):
         self.start = None
         self.end = None
         self.strand = None
-        self.expr_data = None
+        self.tree_starts = IntervalTree()
+        self.tree_ends = IntervalTree()
         self.ref_start_sites = set()
         self.ref_stop_sites = set()
         self.start_sites = set()
         self.stop_sites = set()
+        self.expr_data = None
         self.node_bounds = None
         self.G = None
+
+    @staticmethod
+    def create(transfrags,
+               guided_ends=False,
+               guided_assembly=False):
+        self = SpliceGraph()
+        self.guided_ends = guided_ends
+        self.guided_assembly = guided_assembly
+        self._add_transfrags(transfrags)
+        self.expr_data = self._compute_expression()
+        self.node_bounds = self._find_node_boundaries()
+        self.G = self._create_splice_graph()
+        self._mark_start_stop_nodes()
+        return self
+
+    def _add_transfrags(self, transfrags):
+        self.transfrags = []
+        self.chrom = None
+        self.start = None
+        self.end = None
+        self.strand = None
+        self.ref_start_sites = set()
+        self.ref_stop_sites = set()
+        self.tree_starts = IntervalTree()
+        self.tree_ends = IntervalTree()
+        for t in transfrags:
+            if self.chrom is None:
+                self.chrom = t.chrom
+            elif self.chrom != t.chrom:
+                raise TacoError('chrom mismatch')
+            if self.strand is None:
+                self.strand = t.strand
+            elif self.strand != t.strand:
+                raise TacoError('strand mismatch')
+            if self.start is None:
+                self.start = t.start
+            else:
+                self.start = min(t.start, self.start)
+            if self.end is None:
+                self.end = t.end
+            else:
+                self.end = max(t.end, self.end)
+            if t.is_ref:
+                self.ref_start_sites.add(t.txstart)
+                self.ref_stop_sites.add(t.txstop)
+            else:
+                self._add_to_interval_trees(t)
+            self.transfrags.append(t)
+        self.ref_start_sites = sorted(self.ref_start_sites)
+        self.ref_stop_sites = sorted(self.ref_stop_sites)
+
+    def _compute_expression(self):
+        expr_data = np.zeros(self.end - self.start, dtype=FLOAT_DTYPE)
+        for t in self.transfrags:
+            if not t.is_ref:
+                for exon in t.exons:
+                    astart = exon.start - self.start
+                    aend = exon.end - self.start
+                    expr_data[astart:aend] += t.expr
+        return expr_data
 
     def _find_node_boundaries(self):
         node_bounds = set((self.start, self.end))
         node_bounds.update(self.start_sites)
         node_bounds.update(self.stop_sites)
         # nodes bounded by regions where expression changes to/from zero
-        zero_points = find_change_points(self.expr_data, start=self.start)
-        node_bounds.update(zero_points)
+        node_bounds.update(find_threshold_points(self.expr_data, self.start))
         # nodes bounded by introns
         for t in self.transfrags:
             if t.is_ref:
@@ -93,37 +155,6 @@ class SpliceGraph(object):
             else:
                 node_bounds.update(t.itersplices())
         return sorted(node_bounds)
-
-    def _mark_start_stop_nodes(self):
-        G = self.G
-        # get all leaf nodes
-        for n, nd in G.nodes_iter(data=True):
-            if G.in_degree(n) == 0:
-                nd[Node.IS_START] = True
-            if G.out_degree(n) == 0:
-                nd[Node.IS_STOP] = True
-        # mark change points
-        change_points = set()
-        change_points.update(set((Node.IS_START, x) for x in self.start_sites))
-        change_points.update(set((Node.IS_STOP, x) for x in self.stop_sites))
-        if self.guided_ends:
-            change_points.update((Node.IS_START, x)
-                                 for x in self.ref_start_sites)
-            change_points.update((Node.IS_STOP, x)
-                                 for x in self.ref_stop_sites)
-        node_bounds = self.node_bounds
-
-        strand = self.strand
-        for direction, pos in change_points:
-            if ((direction == Node.IS_STOP and strand == Strand.NEG) or
-                (direction == Node.IS_START and strand != Strand.NEG)):
-                bisect_func = bisect.bisect_right
-            else:
-                bisect_func = bisect.bisect_left
-            i = bisect_func(node_bounds, pos)
-            n = (node_bounds[i-1], node_bounds[i])
-            assert n in G
-            G.node[n][direction] = True
 
     def _create_splice_graph(self):
         '''returns networkx DiGraph object'''
@@ -159,76 +190,109 @@ class SpliceGraph(object):
                 u = v
         return G
 
-    @staticmethod
-    def create(transfrags,
-               guided_ends=False,
-               guided_assembly=False):
-        self = SpliceGraph()
-        self.guided_ends = guided_ends
-        self.guided_assembly = guided_assembly
-
-        for t in transfrags:
-            if self.chrom is None:
-                self.chrom = t.chrom
-            elif self.chrom != t.chrom:
-                raise TacoError('chrom mismatch')
-            if self.strand is None:
-                self.strand = t.strand
-            elif self.strand != t.strand:
-                raise TacoError('strand mismatch')
-            if self.start is None:
-                self.start = t.start
+    def _mark_start_stop_nodes(self):
+        G = self.G
+        # get all leaf nodes
+        for n, nd in G.nodes_iter(data=True):
+            if G.in_degree(n) == 0:
+                nd[Node.IS_START] = True
+            if G.out_degree(n) == 0:
+                nd[Node.IS_STOP] = True
+        # mark change points
+        change_points = set()
+        change_points.update(set((Node.IS_START, x) for x in self.start_sites))
+        change_points.update(set((Node.IS_STOP, x) for x in self.stop_sites))
+        if self.guided_ends:
+            change_points.update((Node.IS_START, x)
+                                 for x in self.ref_start_sites)
+            change_points.update((Node.IS_STOP, x)
+                                 for x in self.ref_stop_sites)
+        node_bounds = self.node_bounds
+        strand = self.strand
+        for direction, pos in change_points:
+            if ((direction == Node.IS_STOP and strand == Strand.NEG) or
+                (direction == Node.IS_START and strand != Strand.NEG)):
+                bisect_func = bisect.bisect_right
             else:
-                self.start = min(t.start, self.start)
-            if self.end is None:
-                self.end = t.end
-            else:
-                self.end = max(t.end, self.end)
-            if t.is_ref:
-                self.ref_start_sites.add(t.txstart)
-                self.ref_stop_sites.add(t.txstop)
-            self.transfrags.append(t)
+                bisect_func = bisect.bisect_left
+            i = bisect_func(node_bounds, pos)
+            n = (node_bounds[i-1], node_bounds[i])
+            assert n in G
+            G.node[n][direction] = True
 
-        self.ref_start_sites = sorted(self.ref_start_sites)
-        self.ref_stop_sites = sorted(self.ref_stop_sites)
-        self.expr_data = np.zeros(self.end - self.start, dtype=FLOAT_DTYPE)
-        for t in self.transfrags:
-            if not t.is_ref:
-                for exon in t.exons:
-                    astart = exon.start - self.start
-                    aend = exon.end - self.start
-                    self.expr_data[astart:aend] += t.expr
+    def _add_to_interval_trees(self, t):
+        istart = Interval(t.start, t.start+1, value=t)
+        iend = Interval(t.end-1, t.end, value=t)
+        self.tree_starts.insert_interval(istart)
+        self.tree_ends.insert_interval(iend)
 
+    def _trim_change_point(self, cp_pos, cp_start, cp_end, cp_sign):
+        # search for matches in change point interval
+        num_trimmed = 0
+        if cp_sign < 0:
+            hits = self.tree_ends.find(cp_pos, cp_end)
+            for hit in hits:
+                t = hit.value
+                # last exon start cannot overlap interval
+                last_exon_start = t.exons[-1][0]
+                if cp_pos <= last_exon_start <= cp_end:
+                    continue
+                # trim end left
+                t.exons[-1] = Exon(last_exon_start, cp_pos)
+                num_trimmed += 1
+        else:
+            hits = self.tree_starts.find(cp_start, cp_pos)
+            for hit in hits:
+                t = hit.value
+                # first exon end cannot overlap interval
+                first_exon_end = t.exons[0][1]
+                if cp_start <= first_exon_end <= cp_pos:
+                    continue
+                # trim start right
+                t.exons[0] = Exon(cp_pos, first_exon_end)
+                num_trimmed += 1
+        logging.debug('\tfound %d hits and trimmed %d' % (len(hits), num_trimmed))
+
+    def detect_change_points(self, trim, *args, **kwargs):
+        '''
+        trim: if true, will trim transfrags around change points
+        *args, **kwargs: passed directly to 'run_changepoint'
+
+        returns number of change points found
+        '''
+        for node in self.G:
+            expr_data = self.get_expr_data(node.start, node.end)
+            changepts = run_changepoint(expr_data, *args, **kwargs)
+            # add start and stop sites
+            for cp in changepts:
+                cp_left = cp.index - cp.dist_left
+                cp_right = cp.index + cp.dist_right
+                cp_pos = node.start + cp.index
+                cp_start = node.start + cp_left
+                cp_end = node.start + cp_right
+                logging.debug('\tchange point: %s:%d(%d-%d)[%s] node(%d-%d) '
+                              'sign=%f pval=%f fc=%f' %
+                              (self.chrom, node.start + cp.index,
+                               cp_start, cp_end,
+                               Strand.to_gtf(self.strand),
+                               node.start, node.end,
+                               cp.sign, cp.pvalue, cp.foldchange))
+                if ((self.strand != Strand.NEG and cp.sign < 0) or
+                    (self.strand == Strand.NEG and cp.sign > 0)):
+                    self.stop_sites.add(cp_pos)
+                else:
+                    self.start_sites.add(cp_pos)
+                if trim:
+                    self._trim_change_point(cp_pos, cp_start, cp_end, cp.sign)
+        return len(changepts)
+
+    def recreate(self):
+        self._add_transfrags(self.transfrags)
+        self.expr_data = self._compute_expression()
         self.node_bounds = self._find_node_boundaries()
         self.G = self._create_splice_graph()
         self._mark_start_stop_nodes()
         return self
-
-    def detect_change_points(self):
-        for node in self.G:
-            expr_data = self.get_expr_data(node.start, node.end)
-            changepts = run_changepoint(expr_data)
-            # add start and stop sites
-            for changept, pvalue, slope_left, slope_right, sign in changepts:
-                m = ('%s:%d(%d-%d)[%s] node(%d-%d) sign=%f pvalue=%f' %
-                     (self.chrom,
-                      node.start + changept,
-                      node.start + changept - slope_left,
-                      node.start + changept + slope_right,
-                      Strand.to_gtf(self.strand),
-                      node.start, node.end,
-                      sign, pvalue))
-                logging.debug('Change Point: ' + m)
-                if ((self.strand == Strand.POS and sign < 0) or
-                    (self.strand == Strand.NEG and sign > 0)):
-                    self.stop_sites.add(node.start + changept)
-                else:
-                    self.start_sites.add(node.start + changept)
-
-    def recreate_graph(self):
-        self.node_bounds = self._find_node_boundaries()
-        self.G = self._create_splice_graph()
-        self._mark_start_stop_nodes()
 
     def split(self):
         '''splits into weakly connected component subgraphs'''

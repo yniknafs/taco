@@ -9,9 +9,8 @@ from dtypes cimport FLOAT_DTYPE_t
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def find_change_points(np.ndarray[FLOAT_DTYPE_t, ndim=1] a,
-                       int start=0,
-                       FLOAT_DTYPE_t threshold=0):
+def find_threshold_points(np.ndarray[FLOAT_DTYPE_t, ndim=1] a,
+                          int start=0, FLOAT_DTYPE_t threshold=0):
     '''
     a - numpy array of expression data (all values >= 0)
     start - genomic start of 'a'

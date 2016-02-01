@@ -21,7 +21,7 @@ __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2015"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "1.0.1"
+__version__ = "0.4.0"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -37,8 +37,12 @@ class Args:
     MAX_FRAG_LENGTH = 400
     FRAC_ISOFORM = 0.01
     MAX_ISOFORMS = 100
-    OUTPUT_DIR = 'taco'
+    CHANGE_POINT = True
+    CHANGE_POINT_PVALUE = 0.05
+    CHANGE_POINT_FOLD_CHANGE = 0.80
+    CHANGE_POINT_TRIM = True
     RESUME = False
+    OUTPUT_DIR = 'taco'
     PROG = 'taco'
     DESCRIPTION = 'Meta-assembly of RNA-Seq datasets'
 
@@ -72,6 +76,38 @@ class Args:
                             help='Option reference GTF file of "true" '
                             'validated transcripts to facilitate guided '
                             'assembly and/or noise filtering')
+        parser.add_argument('--change-point', dest='change_point',
+                            action='store_true',
+                            default=Args.CHANGE_POINT,
+                            help='Enable change point detection [default='
+                            '%(default)s]')
+        parser.add_argument('--no-change-point', dest='change_point',
+                            action='store_false',
+                            help='Disable change point detection')
+        parser.add_argument('--change-point-pvalue',
+                            dest='change_point_pvalue',
+                            default=Args.CHANGE_POINT_PVALUE,
+                            metavar='<float 0.0-1.0>',
+                            help='Mann-Whitney-U p-value threshold for '
+                            'calling change points [default=%(default)s]')
+        parser.add_argument('--change-point-fold-change',
+                            dest='change_point_fold_change',
+                            default=Args.CHANGE_POINT_FOLD_CHANGE,
+                            metavar='<float 0.0-1.0>',
+                            help='Fold change threshold between the means of '
+                            'two putative segments on either side of a change '
+                            'point. A value of 0.0 is the most strict '
+                            'setting, effectively calling no change points. '
+                            'Conversely, setting the value to 1.0 calls all'
+                            'change points [default=%(default)s]')
+        parser.add_argument('--change-point-trim', dest='change_point_trim',
+                            action='store_true',
+                            default=Args.CHANGE_POINT_TRIM,
+                            help='Trim transfrags around change points '
+                            '[default=%(default)s]')
+        parser.add_argument('--no-change-point-trim', dest='change_point_trim',
+                            action='store_false',
+                            help='Disable trimming around change points')
         parser.add_argument('--guided-strand', dest='guided_strand',
                             action='store_true',
                             default=Args.GUIDED_STRAND,
@@ -138,6 +174,11 @@ class Args:
         func(fmt.format('output directory:', str(args.output_dir)))
         func(fmt.format('chrom sizes file:', str(args.chrom_sizes_file)))
         func(fmt.format('reference GTF file:', str(args.ref_gtf_file)))
+        func(fmt.format('change point:', str(args.change_point)))
+        func(fmt.format('change point pvalue:', str(args.change_point_pvalue)))
+        func(fmt.format('change point fold change:',
+             str(args.change_point_fold_change)))
+        func(fmt.format('change point trim:', str(args.change_point_trim)))
         func(fmt.format('guided assembly mode:', str(args.guided_assembly)))
         func(fmt.format('guided strand mode:', str(args.guided_strand)))
         func(fmt.format('guided ends mode:', str(args.guided_ends)))
@@ -191,7 +232,11 @@ class Args:
                 parser.error("frac_isoform out of range (0.0-1.0)")
             if (args.max_isoforms < 1):
                 parser.error("max_isoforms <= 0")
-
+            if (args.change_point):
+                if not (0.0 <= args.change_point_pvalue <= 1.0):
+                    parser.error('change point pvalue invalid')
+                if not (0.0 <= args.change_point_fold_change <= 1.0):
+                    parser.error('change point fold change invalid')
             if args.ref_gtf_file is not None:
                 if not os.path.exists(args.ref_gtf_file):
                     parser.error("reference GTF file %s not found" %
@@ -351,7 +396,7 @@ class Run(object):
     def assemble(self):
         r = self.results
         a = self.args
-        
+
         assemble(gtf_file=r.transfrags_gtf_file,
                  unresolved_bg_files=r.unresolved_bg_files,
                  resolved_bg_files=r.resolved_bg_files,
@@ -362,6 +407,10 @@ class Run(object):
                  assembly_gtf_file=r.assembly_gtf_file,
                  assembly_bed_file=r.assembly_bed_file,
                  min_path_length=a.max_frag_length,
+                 change_point=a.change_point,
+                 change_point_pvalue=a.change_point_pvalue,
+                 change_point_fold_change=a.change_point_fold_change,
+                 change_point_trim=a.change_point_trim,
                  frac_isoform=a.frac_isoform,
                  max_isoforms=a.max_isoforms,
                  guided_strand=a.guided_strand,

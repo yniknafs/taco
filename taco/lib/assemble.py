@@ -58,6 +58,10 @@ class Config(object):
         self.assembly_gtf_file = None
         self.assembly_bed_file = None
         self.min_path_length = 400
+        self.change_point = True
+        self.change_point_pvalue = 0.05
+        self.change_point_fold_change = 0.85
+        self.change_point_trim = True
         self.frac_isoform = 0.01
         self.max_isoforms = 100
         self.guided_strand = False
@@ -162,9 +166,6 @@ def assemble_isoforms(sgraph, min_path_length, frac_isoform, max_isoforms):
     k = choose_k(sgraph.transfrags,
                  sgraph.node_bounds,
                  min_path_length=min_path_length)
-    logging.debug('%s:%d-%d[%s] nodes=%d' %
-                  (sgraph.chrom, sgraph.start, sgraph.end,
-                   Strand.to_gtf(sgraph.strand), len(sgraph.G)))
     K, lost_paths = create_path_graph(sgraph, k)
     # smooth kmer graph
     smooth_graph(K)
@@ -189,12 +190,21 @@ def assemble_isoforms(sgraph, min_path_length, frac_isoform, max_isoforms):
 
 
 def assemble_gene(sgraph, locus_id_str, config):
+    logging.debug('%s:%d-%d[%s] nodes=%d' %
+                  (sgraph.chrom, sgraph.start, sgraph.end,
+                   Strand.to_gtf(sgraph.strand), len(sgraph.G)))
     # output node data for change point analysis
     for f in sgraph.get_node_gtf():
         print >>config.node_gtf_fh, str(f)
-    # detect change points
-    sgraph.detect_change_points()
-    sgraph.recreate_graph()
+    if config.change_point:
+        # detect change points
+        num_change_points = \
+            sgraph.detect_change_points(trim=config.change_point_trim,
+                                        pval=config.change_point_pvalue,
+                                        fc_cutoff=config.change_point_fold_change)
+        if num_change_points > 0:
+            # must recreate splice graph after finding change points
+            sgraph.recreate()
     # run isoform path finding algorithm
     isoforms = assemble_isoforms(sgraph, config.min_path_length,
                                  config.frac_isoform, config.max_isoforms)

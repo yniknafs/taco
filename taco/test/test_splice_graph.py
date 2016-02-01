@@ -7,16 +7,17 @@ import numpy as np
 from taco.lib.base import TacoError, Strand, Exon
 from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.transfrag import Transfrag
-from taco.lib.cChangePoint import find_change_points as c_find_change_points
-from taco.lib.changepoint import find_change_points
+from taco.lib.cChangePoint import find_threshold_points as \
+    find_threshold_points_cy
+from taco.lib.changepoint import find_threshold_points
 from taco.lib.locus import Locus
 from taco.lib.splice_graph import split_transfrag, SpliceGraph, Node
 
 from taco.test.base import read_gtf, read_single_locus
 
 
-def test_find_change_points():
-    for func in (find_change_points, c_find_change_points):
+def test_find_threshold_points():
+    for func in (find_threshold_points, find_threshold_points_cy):
         a = np.ones(10, dtype=FLOAT_DTYPE)
         assert len(func(a)) == 0
         a = np.zeros(10, dtype=FLOAT_DTYPE)
@@ -40,7 +41,7 @@ def test_find_node_boundaries():
     # aggregate expression
     sg = SpliceGraph.create(transfrags)
     # zero change points
-    zero_sites = tuple(find_change_points(sg.expr_data, sg.start))
+    zero_sites = tuple(find_threshold_points(sg.expr_data, sg.start))
     assert zero_sites == (100, 150, 300, 375)
     # combined boundaries
     boundaries = tuple(sg._find_node_boundaries())
@@ -65,7 +66,7 @@ def test_mark_start_stop_sites1():
     assert nd[Node.IS_START] and nd[Node.IS_STOP]
     # add a start site change point
     sgraph.start_sites.add(125)
-    sgraph.recreate_graph()
+    sgraph.recreate()
     G = sgraph.G
     assert len(G) == 2
     n = Exon(50, 125)
@@ -78,7 +79,7 @@ def test_mark_start_stop_sites1():
     assert nd[Node.IS_START] and nd[Node.IS_STOP]
     # add a stop site change point
     sgraph.stop_sites.add(80)
-    sgraph.recreate_graph()
+    sgraph.recreate()
     G = sgraph.G
     assert len(G) == 3
     n = Exon(50, 80)
@@ -106,7 +107,7 @@ def test_mark_start_stop_sites1():
     assert nd[Node.IS_START] and nd[Node.IS_STOP]
     # add a start site change point
     sgraph.start_sites.add(125)
-    sgraph.recreate_graph()
+    sgraph.recreate()
     G = sgraph.G
     assert len(G) == 2
     n = Exon(50, 125)
@@ -119,7 +120,7 @@ def test_mark_start_stop_sites1():
     assert nd[Node.IS_START] and not nd[Node.IS_STOP]
     # add a stop site change point
     sgraph.stop_sites.add(80)
-    sgraph.recreate_graph()
+    sgraph.recreate()
     G = sgraph.G
     assert len(G) == 3
     n = Exon(50, 80)
