@@ -22,7 +22,7 @@ __status__ = "Development"
 
 
 def run_changepoint(a, size_cutoff=20, cp_func=mse_cython,
-                    smooth_window="hanning", window_len=75):
+                    smooth_window="hanning", window_len=75, fc_cutoff=0.25):
     '''
     a: array with expression data
     size_cutoff: minimum length of interval to allow recursive change point
@@ -41,7 +41,8 @@ def run_changepoint(a, size_cutoff=20, cp_func=mse_cython,
     if a.shape[0] < window_len:
         return []
     s_a = np.gradient(smooth(a, window_len=window_len, window=smooth_window))
-    cps = bin_seg_slope(a, s_a, cp_func, size_cutoff=size_cutoff)
+    cps = bin_seg_slope(a, s_a, cp_func, size_cutoff=size_cutoff, 
+                        fc_cutoff=fc_cutoff)
     return cps
 
 
@@ -73,7 +74,6 @@ def slope_extract(slope_a, i):
             k += 1
     return (j, k, sign)
 
-
 def mwu_ediff(a, i):
     a1 = a[:i]
     a2 = a[i:]
@@ -89,8 +89,8 @@ def mwu_ediff(a, i):
         return (U, p)
 
 
-def bin_seg_slope(a, s_a, cp_func=mse_cython, PVAL=0.05, cps=None, offset=0,
-                  size_cutoff=20):
+def bin_seg_slope(a, s_a, cp_func=mse_cython, fc_cutoff=0.25, PVAL=0.05, 
+                    cps=None, offset=0, size_cutoff=20, mean_buffer=5):
     '''
     a: expr data vector
     s_a: slope vector
@@ -110,19 +110,27 @@ def bin_seg_slope(a, s_a, cp_func=mse_cython, PVAL=0.05, cps=None, offset=0,
     if i <= 1:
         return cps
     elif p < PVAL:
+        #mean foldchange cutoff
+        m1 = a[:i].mean() + mean_buffer
+        m2 = a[i:].mean() + mean_buffer
+        fc = np.log2(m2/m1)
+        # print i, p, m1, m2, fc
+        if abs(fc) < fc_cutoff: 
+            return cps
         j, k, sign = slope_extract(s_a, offset + i)
         if j != 0 and k != 0:
             # save changepoint
-            cps.append((i + offset, p, j, k, sign))
+            cps.append((i + offset, p, j, k, sign, fc))
             # test left
             if (offset+i-j) > offset:
                 b1 = a[:i-j]
-                cps = bin_seg_slope(b1, s_a, cp_func, cps=cps, offset=offset)
+                cps = bin_seg_slope(b1, s_a, cp_func, cps=cps, offset=offset,
+                                    fc_cutoff=fc_cutoff)
             # test right
             if (offset+i+k) < offset+len(a):
                 b2 = a[i+k:]
                 cps = bin_seg_slope(b2, s_a, cp_func, cps=cps,
-                                    offset=(offset + i + k))
+                                    offset=(offset + i + k), fc_cutoff=fc_cutoff)
     return cps
 
 
