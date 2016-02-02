@@ -42,7 +42,7 @@ class GTF:
         TRANSCRIPT_ID = 'transcript_id'
         SAMPLE_ID = 'sample_id'
         REF = 'ref'
-        EXPRESSION = 'expr'
+        EXPR = 'expr'
 
     class Feature:
         '''

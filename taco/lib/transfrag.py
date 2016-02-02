@@ -81,7 +81,7 @@ class Transfrag(object):
                          strand=Strand.from_gtf(f.strand),
                          _id=f.attrs[GTF.Attr.TRANSCRIPT_ID],
                          sample_id=f.attrs.get(GTF.Attr.SAMPLE_ID, None),
-                         expr=float(f.attrs.get(GTF.Attr.EXPRESSION, 0.0)),
+                         expr=float(f.attrs.get(GTF.Attr.EXPR, 0.0)),
                          is_ref=bool(int(f.attrs.get(GTF.Attr.REF, '0'))),
                          exons=None)
 
