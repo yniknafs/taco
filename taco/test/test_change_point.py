@@ -8,10 +8,13 @@ import matplotlib.pyplot as plt
 
 from taco.lib.base import Strand, Exon
 from taco.lib.dtypes import FLOAT_DTYPE
-from taco.lib.splice_graph import SpliceGraph
+from taco.lib.splice_graph import SpliceGraph, Node
 from taco.lib.cChangePoint import mse as mse_cython
 from taco.lib.changepoint import mse as mse_python, smooth, run_changepoint
+from taco.lib.assemble import assemble_isoforms
 from taco.lib.transfrag import Transfrag
+
+from taco.test.base import read_single_locus
 
 
 def test_mse():
@@ -139,6 +142,49 @@ def test_trim_transfrags():
     return
 
 
+def test_ccle55_cuff_noc2l():
+    '''Locus containing from 55 CCLE samples assembled with Cufflinks'''
+    # pull SpliceGraph out of GTF
+    t_dict, locus = read_single_locus('noc2l_locus.gtf')
+    found_sgraph = False
+    for sgraph in locus.create_splice_graphs():
+        if (sgraph.chrom == 'chr1' and sgraph.start == 934942 and
+            sgraph.end == 976702 and sgraph.strand == Strand.NEG):
+            found_sgraph = True
+            break
+    assert found_sgraph
+
+    # examine specific change points
+    trim = False
+    pval = 0.05
+    fc_cutoff = 0.8
+    n1 = Exon(934942, 944589)
+    assert sgraph.G.node[n1][Node.IS_STOP]
+    sgraph.detect_change_points(trim=trim, pval=pval, fc_cutoff=fc_cutoff)
+    true_starts = set([964528, 957434, 959316])
+    true_stops = set([944278])
+    assert true_starts.symmetric_difference(sgraph.start_sites) == set([])
+    assert true_stops.symmetric_difference(sgraph.stop_sites) == set([])
+
+    # rebuild graph and examine start/stop nodes
+    sgraph.recreate()
+
+    # get start/stop nodes
+    start_nodes, stop_nodes = sgraph.get_start_stop_nodes()
+    assert Exon(959214, 959316) in start_nodes
+    assert Exon(959316, 964528) in start_nodes
+    assert Exon(957273, 957434) in start_nodes
+    assert Exon(944278, 944589) in stop_nodes
+
+    # ensure best path uses change points
+    isoforms = assemble_isoforms(sgraph, 400, 0, 1)
+    assert len(isoforms) == 1
+    isoform = isoforms[0]
+    assert isoform.path[0] == Exon(944278, 944800)
+    assert isoform.path[-1] == Exon(959214, 959316)
+    return
+
+
 def get_data(rundir, chrom, start, end, strand):
     filename = os.path.join(rundir, 'expression.h5')
     f = h5py.File(filename, 'r')
@@ -153,6 +199,8 @@ def get_data(rundir, chrom, start, end, strand):
 
 
 def plot_slope(a, refs=None):
+    if refs is None:
+        refs = []
     smooth_a = np.array(smooth(a, window_len=75, window="hanning"), dtype=FLOAT_DTYPE)
     slope_a = np.gradient(smooth_a)
 
@@ -180,7 +228,7 @@ def plot_slope(a, refs=None):
     plt.show()
 
 
-def test_real_data():
+def test_anecdotes():
 
     def tester(tup, ref):
         chrom, start, end, strand = tup

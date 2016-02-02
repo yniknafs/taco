@@ -105,10 +105,10 @@ def bin_seg_slope(a, s_a, pval=0.05, fc_cutoff=0.80, size_cutoff=20,
     cps: (recursion) list of change points
     offset: (recursion) offset into vectors
     '''
-    if a.shape[0] < size_cutoff:
-        return cps
     if cps is None:
         cps = []
+    if a.shape[0] < size_cutoff:
+        return cps
     # choose candidate change point
     stat, i = cp_func(a)
     if i <= 1:

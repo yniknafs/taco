@@ -198,13 +198,11 @@ def assemble_gene(sgraph, locus_id_str, config):
         print >>config.node_gtf_fh, str(f)
     if config.change_point:
         # detect change points
-        num_change_points = \
-            sgraph.detect_change_points(trim=config.change_point_trim,
-                                        pval=config.change_point_pvalue,
-                                        fc_cutoff=config.change_point_fold_change)
-        if num_change_points > 0:
-            # must recreate splice graph after finding change points
-            sgraph.recreate()
+        sgraph.detect_change_points(trim=config.change_point_trim,
+                                    pval=config.change_point_pvalue,
+                                    fc_cutoff=config.change_point_fold_change)
+        # must recreate splice graph after finding change points
+        sgraph.recreate()
     # run isoform path finding algorithm
     isoforms = assemble_isoforms(sgraph, config.min_path_length,
                                  config.frac_isoform, config.max_isoforms)

@@ -271,8 +271,6 @@ class SpliceGraph(object):
         '''
         trim: if true, will trim transfrags around change points
         *args, **kwargs: passed directly to 'run_changepoint'
-
-        returns number of change points found
         '''
         for node in self.G:
             expr_data = self.get_expr_data(node.start, node.end)
@@ -286,8 +284,7 @@ class SpliceGraph(object):
                 cp_end = node.start + cp_right
                 logging.debug('\tchange point: %s:%d(%d-%d)[%s] node(%d-%d) '
                               'sign=%f pval=%f fc=%f' %
-                              (self.chrom, node.start + cp.index,
-                               cp_start, cp_end,
+                              (self.chrom, cp_pos, cp_start, cp_end,
                                Strand.to_gtf(self.strand),
                                node.start, node.end,
                                cp.sign, cp.pvalue, cp.foldchange))
@@ -298,7 +295,6 @@ class SpliceGraph(object):
                     self.start_sites.add(cp_pos)
                 if trim:
                     self._trim_change_point(cp_pos, cp_start, cp_end, cp.sign)
-        return len(changepts)
 
     def split(self):
         '''splits into weakly connected component subgraphs'''
