@@ -64,10 +64,10 @@ def smooth_graph(G, expr_attr=NODE_EXPR):
         d[expr_attr] += d[SMOOTH_TMP]
 
 
-def choose_k(transfrags, node_bounds, min_path_length=400, kmin=2):
+def choose_k(transfrags_iter, node_bounds, min_path_length=400, kmin=2):
     assert kmin > 0
     k = 1
-    for t in transfrags:
+    for t in transfrags_iter:
         node_lengths = [(n[1] - n[0]) for n in split_transfrag(t, node_bounds)]
         # initialize
         path_length = 0
@@ -200,7 +200,7 @@ def create_path_graph(sgraph, k):
     kmer_paths = []
     current_id = 0
     short_partial_path_dict = collections.defaultdict(lambda: [])
-    for t in sgraph.get_transfrags():
+    for t in sgraph.itertransfrags():
         # get nodes
         path = get_path(sgraph, t)
         # check for start and stop nodes

@@ -163,7 +163,7 @@ def annotate_gene_and_tss_ids(isoforms, strand,
 
 def assemble_isoforms(sgraph, min_path_length, frac_isoform, max_isoforms):
     # choose a k-mer size 'k' based on a desired minimum path length
-    k = choose_k(sgraph.transfrags,
+    k = choose_k(sgraph.itertransfrags(),
                  sgraph.node_bounds,
                  min_path_length=min_path_length)
     K, lost_paths = create_path_graph(sgraph, k)
@@ -257,9 +257,8 @@ def assemble_locus(gtf_lines, config):
                          config.guided_strand,
                          config.guided_ends,
                          config.guided_assembly)
-    logging.debug('Locus %s:%d-%d: '
-                  '%d transfrags (+: %d, -: %d, .: %d)' %
-                  (locus.chrom, locus.start, locus.end, len(t_dict),
+    logging.debug('\t%d transfrags (+: %d, -: %d, .: %d)' %
+                  (len(t_dict),
                    len(locus.get_transfrags(Strand.POS)),
                    len(locus.get_transfrags(Strand.NEG)),
                    len(locus.get_transfrags(Strand.NA))))
@@ -268,9 +267,8 @@ def assemble_locus(gtf_lines, config):
     # resolve unstranded transcripts
     num_resolved = locus.impute_unknown_strands()
     if num_resolved > 0:
-        logging.debug('Locus %s:%d-%d: %d '
-                      'resolved (+: %d, -: %d, .: %d)' %
-                      (locus.chrom, locus.start, locus.end, num_resolved,
+        logging.debug('\t%d resolved (+: %d, -: %d, .: %d)' %
+                      (num_resolved,
                        len(locus.get_transfrags(Strand.POS)),
                        len(locus.get_transfrags(Strand.NEG)),
                        len(locus.get_transfrags(Strand.NA))))

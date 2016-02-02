@@ -142,6 +142,9 @@ def find_suboptimal_paths(G, source, sink, fraction_major_path=1e-3,
     # that arise if the heuristic assumptions of the algorithm fail
     path_results = collections.OrderedDict()
     # define threshold score to stop producing suboptimal paths
+    max_score = G.node[source][NODE_EXPR]
+    if max_score < MIN_SCORE:
+        return []
     lowest_score = G.node[source][NODE_EXPR] * fraction_major_path
     lowest_score = max(MIN_SCORE, lowest_score)
     # find highest scoring path

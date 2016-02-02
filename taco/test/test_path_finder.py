@@ -1,19 +1,20 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
-import networkx as nx
 
-from taco.lib.path_graph import init_node_attrs, SOURCE, SINK
-from taco.lib.path_finder import find_path, init_tmp_attributes
+from taco.lib.base import Strand
+from taco.lib.assemble import assemble_isoforms
+from taco.lib.splice_graph import SpliceGraph
+
+from taco.test.base import read_single_locus
 
 
-def test_path_finder1():
-    G = nx.DiGraph()
-    # nodes
-    for n in [SOURCE, 1, 2, SINK]:
-        G.add_node(n, attr_dict=init_node_attrs())
-    # edges
-    G.add_edges_from([(SOURCE, 1), (1, 2), (2, SINK)])
-    # find path
-    init_tmp_attributes(G)
-    print find_path(G, SOURCE, SINK)
+def test_empty_graph_bug():
+    t_dict, locus = read_single_locus('empty_graph_bug.gtf')
+    transfrags = locus.get_transfrags(Strand.POS)
+    sgraph = SpliceGraph.create(transfrags)
+    isoforms = assemble_isoforms(sgraph,
+                                 min_path_length=400,
+                                 frac_isoform=0.01,
+                                 max_isoforms=100)
+    assert len(isoforms) == 0

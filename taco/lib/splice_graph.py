@@ -4,6 +4,7 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 import logging
 import collections
 import bisect
+from itertools import chain
 import networkx as nx
 import numpy as np
 
@@ -29,6 +30,37 @@ class Node:
     IS_START = 'is_start'
     IS_STOP = 'is_stop'
     IS_REF = 'is_ref'
+
+    @staticmethod
+    def init():
+        return {Node.IS_START: False,
+                Node.IS_STOP: False,
+                Node.IS_REF: False}
+
+    @staticmethod
+    def add(G, n, is_ref=False):
+        if n not in G:
+            G.add_node(n, attr_dict=Node.init())
+        if is_ref:
+            G.node[n][Node.IS_REF] = True
+
+
+def _splice_graph_add_transfrag(G, t, node_bounds):
+    # split exons that cross boundaries and get the
+    # nodes that made up the transfrag
+    nodes = [Exon(a, b) for (a, b) in
+             split_transfrag(t, node_bounds)]
+    if t.strand == Strand.NEG:
+        nodes.reverse()
+    # add nodes/edges to graph
+    u = nodes[0]
+    Node.add(G, u, is_ref=t.is_ref)
+    for i in xrange(1, len(nodes)):
+        v = nodes[i]
+        Node.add(G, v, is_ref=t.is_ref)
+        G.add_edge(u, v)
+        u = v
+    return G
 
 
 def _array_subset(a, start, end):
@@ -65,6 +97,7 @@ class SpliceGraph(object):
         self.guided_ends = False
         self.guided_assembly = False
         self.transfrags = []
+        self.ref_transfrags = []
         self.chrom = None
         self.start = None
         self.end = None
@@ -93,8 +126,16 @@ class SpliceGraph(object):
         self._mark_start_stop_nodes()
         return self
 
+    def recreate(self):
+        self._add_transfrags(chain(self.transfrags, self.ref_transfrags))
+        self.expr_data = self._compute_expression()
+        self.node_bounds = self._find_node_boundaries()
+        self.G = self._create_splice_graph()
+        self._mark_start_stop_nodes()
+
     def _add_transfrags(self, transfrags):
         self.transfrags = []
+        self.ref_transfrags = []
         self.chrom = None
         self.start = None
         self.end = None
@@ -123,20 +164,20 @@ class SpliceGraph(object):
             if t.is_ref:
                 self.ref_start_sites.add(t.txstart)
                 self.ref_stop_sites.add(t.txstop)
+                self.ref_transfrags.append(t)
             else:
                 self._add_to_interval_trees(t)
-            self.transfrags.append(t)
+                self.transfrags.append(t)
         self.ref_start_sites = sorted(self.ref_start_sites)
         self.ref_stop_sites = sorted(self.ref_stop_sites)
 
     def _compute_expression(self):
         expr_data = np.zeros(self.end - self.start, dtype=FLOAT_DTYPE)
         for t in self.transfrags:
-            if not t.is_ref:
-                for exon in t.exons:
-                    astart = exon.start - self.start
-                    aend = exon.end - self.start
-                    expr_data[astart:aend] += t.expr
+            for exon in t.exons:
+                astart = exon.start - self.start
+                aend = exon.end - self.start
+                expr_data[astart:aend] += t.expr
         return expr_data
 
     def _find_node_boundaries(self):
@@ -147,47 +188,20 @@ class SpliceGraph(object):
         node_bounds.update(find_threshold_points(self.expr_data, self.start))
         # nodes bounded by introns
         for t in self.transfrags:
-            if t.is_ref:
+            node_bounds.update(t.itersplices())
+        if self.guided_ends or self.guided_assembly:
+            for t in self.ref_transfrags:
                 if self.guided_ends:
                     node_bounds.update((t.start, t.end))
                 if self.guided_assembly:
                     node_bounds.update(t.itersplices())
-            else:
-                node_bounds.update(t.itersplices())
         return sorted(node_bounds)
 
     def _create_splice_graph(self):
         '''returns networkx DiGraph object'''
-
-        def init_node_attrs():
-            return {Node.IS_START: False,
-                    Node.IS_STOP: False,
-                    Node.IS_REF: False}
-
-        def add_node(G, n, is_ref=False):
-            if n not in G:
-                G.add_node(n, attr_dict=init_node_attrs())
-            if is_ref:
-                G.node[n][Node.IS_REF] = True
-
         G = nx.DiGraph()
-        for t in self.transfrags:
-            if t.is_ref and not self.guided_assembly:
-                continue
-            # split exons that cross boundaries and get the
-            # nodes that made up the transfrag
-            nodes = [Exon(a, b) for (a, b) in
-                     split_transfrag(t, self.node_bounds)]
-            if self.strand == Strand.NEG:
-                nodes.reverse()
-            # add nodes/edges to graph
-            u = nodes[0]
-            add_node(G, u, is_ref=t.is_ref)
-            for i in xrange(1, len(nodes)):
-                v = nodes[i]
-                add_node(G, v, is_ref=t.is_ref)
-                G.add_edge(u, v)
-                u = v
+        for t in self.itertransfrags():
+            _splice_graph_add_transfrag(G, t, self.node_bounds)
         return G
 
     def _mark_start_stop_nodes(self):
@@ -253,7 +267,7 @@ class SpliceGraph(object):
                 num_trimmed += 1
         logging.debug('\tfound %d hits and trimmed %d' % (len(hits), num_trimmed))
 
-    def detect_change_points(self, trim, *args, **kwargs):
+    def detect_change_points(self, trim=True, *args, **kwargs):
         '''
         trim: if true, will trim transfrags around change points
         *args, **kwargs: passed directly to 'run_changepoint'
@@ -286,14 +300,6 @@ class SpliceGraph(object):
                     self._trim_change_point(cp_pos, cp_start, cp_end, cp.sign)
         return len(changepts)
 
-    def recreate(self):
-        self._add_transfrags(self.transfrags)
-        self.expr_data = self._compute_expression()
-        self.node_bounds = self._find_node_boundaries()
-        self.G = self._create_splice_graph()
-        self._mark_start_stop_nodes()
-        return self
-
     def split(self):
         '''splits into weakly connected component subgraphs'''
         # get connected components of graph which represent independent genes
@@ -309,9 +315,7 @@ class SpliceGraph(object):
             for n in Gsub:
                 node_subgraph_map[n] = i
         # assign transfrags to components
-        for t in self.transfrags:
-            if t.is_ref and not self.guided_assembly:
-                continue
+        for t in self.itertransfrags():
             for n in split_transfrag(t, self.node_bounds):
                 n = Exon(*n)
                 subgraph_id = node_subgraph_map[n]
@@ -323,11 +327,11 @@ class SpliceGraph(object):
                                      guided_ends=self.guided_ends,
                                      guided_assembly=self.guided_assembly)
 
-    def get_transfrags(self):
-        for t in self.transfrags:
-            if t.is_ref and not self.guided_assembly:
-                continue
-            yield t
+    def itertransfrags(self):
+        if self.guided_assembly:
+            return chain(self.transfrags, self.ref_transfrags)
+        else:
+            return iter(self.transfrags)
 
     def get_start_stop_nodes(self):
         start_nodes = set()

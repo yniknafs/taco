@@ -88,7 +88,7 @@ def test_trim_transfrags():
     chrom, start, end, strand, change_expr, base_expr, transfrags = tup
     sgraph = SpliceGraph.create(transfrags)
     sgraph.detect_change_points(smooth_window_len=11)
-    sgraph = SpliceGraph.recreate(sgraph)
+    sgraph.recreate()
     assert sgraph.expr_data[cp.index - 1] == 150
     assert sgraph.expr_data[cp.index] == base_expr
     assert cp_pos in sgraph.stop_sites
@@ -98,7 +98,7 @@ def test_trim_transfrags():
     chrom, start, end, strand, left_expr, base_expr, transfrags = tup
     sgraph = SpliceGraph.create(transfrags)
     sgraph.detect_change_points(smooth_window_len=11)
-    sgraph = SpliceGraph.recreate(sgraph)
+    sgraph.recreate()
     assert sgraph.expr_data[cp.index - 1] == 150
     assert sgraph.expr_data[cp.index] == base_expr
     assert cp_pos in sgraph.start_sites
@@ -113,7 +113,7 @@ def test_trim_transfrags():
     assert cp.foldchange < 0.5
     assert cp.sign == 1.0
     sgraph.detect_change_points(smooth_window_len=11)
-    sgraph = SpliceGraph.recreate(sgraph)
+    sgraph.recreate()
     assert sgraph.expr_data[0] == 50
     assert sgraph.expr_data[-1] == 250
     assert sgraph.expr_data[cp.index - 1] == base_expr
@@ -130,7 +130,7 @@ def test_trim_transfrags():
     assert cp.foldchange < 0.5
     assert cp.sign == 1.0
     sgraph.detect_change_points(smooth_window_len=11)
-    sgraph = SpliceGraph.recreate(sgraph)
+    sgraph.recreate()
     assert sgraph.expr_data[0] == 50
     assert sgraph.expr_data[-1] == 250
     assert sgraph.expr_data[cp.index - 1] == base_expr
