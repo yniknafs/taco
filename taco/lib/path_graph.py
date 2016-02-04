@@ -1,6 +1,7 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
+import logging
 import collections
 import networkx as nx
 
@@ -20,10 +21,15 @@ __status__ = "Development"
 # graph attributes
 SOURCE = -1
 SINK = -2
-NODE_EXPR = 'expr'
+KMER_EXPR = 'expr'
 SMOOTH_FWD = 'smfwd'
 SMOOTH_REV = 'smrev'
 SMOOTH_TMP = 'smtmp'
+
+
+def init_node_attrs():
+    return {KMER_EXPR: 0.0, SMOOTH_FWD: 0.0,
+            SMOOTH_REV: 0.0, SMOOTH_TMP: 0.0}
 
 
 def smooth_iteration(G, expr_attr, smooth_attr):
@@ -52,7 +58,7 @@ def smooth_iteration(G, expr_attr, smooth_attr):
                 vd[smooth_attr] += adj_expr
 
 
-def smooth_graph(G, expr_attr=NODE_EXPR):
+def smooth_graph(G, expr_attr=KMER_EXPR):
     # smooth in forward direction
     smooth_iteration(G, expr_attr, SMOOTH_FWD)
     # smooth in reverse direction
@@ -64,50 +70,20 @@ def smooth_graph(G, expr_attr=NODE_EXPR):
         d[expr_attr] += d[SMOOTH_TMP]
 
 
-def choose_k(transfrags_iter, node_bounds, min_path_length=400, kmin=2):
-    assert kmin > 0
-    k = 1
-    for t in transfrags_iter:
-        node_lengths = [(n[1] - n[0]) for n in split_transfrag(t, node_bounds)]
-        # initialize
-        path_length = 0
-        path_k = 0
-        i = 0
-        j = 0
-        while i < len(node_lengths):
-            while j < len(node_lengths):
-                if (path_length >= min_path_length) and ((j - i) >= kmin):
-                    break
-                path_length += node_lengths[j]
-                j += 1
-            path_k = max(path_k, (j - i))
-            if j == len(node_lengths):
-                break
-            path_length -= node_lengths[i]
-            i += 1
-        k = max(k, path_k)
-    return k
-
-
-def init_node_attrs():
-    return {NODE_EXPR: 0.0, SMOOTH_FWD: 0.0,
-            SMOOTH_REV: 0.0, SMOOTH_TMP: 0.0}
-
-
 def add_path(K, path, expr):
     # add first kmer
     from_id = path[0]
     if from_id not in K:
         K.add_node(from_id, attr_dict=init_node_attrs())
     kmerattrs = K.node[from_id]
-    kmerattrs[NODE_EXPR] += expr
+    kmerattrs[KMER_EXPR] += expr
     # the first kmer should be "smoothed" in reverse direction
     kmerattrs[SMOOTH_REV] += expr
     for to_id in path[1:]:
         if to_id not in K:
             K.add_node(to_id, attr_dict=init_node_attrs())
         kmerattrs = K.node[to_id]
-        kmerattrs[NODE_EXPR] += expr
+        kmerattrs[KMER_EXPR] += expr
         # connect kmers
         K.add_edge(from_id, to_id)
         # update from_kmer to continue loop
@@ -137,7 +113,7 @@ def find_short_path_kmers(kmer_hash, K, path, expr):
     total_expr = 0.0
     for kmer_id in kmer_hash[path]:
         # compute total expr at matching kmers
-        kmer_expr = K.node[kmer_id][NODE_EXPR]
+        kmer_expr = K.node[kmer_id][KMER_EXPR]
         total_expr += kmer_expr
         matching_kmers.append((kmer_id, kmer_expr))
     # now calculate fractional densities for matching kmers
@@ -149,27 +125,29 @@ def find_short_path_kmers(kmer_hash, K, path, expr):
         yield ([kmer_id], new_expr)
 
 
-def connect_dangling_ends(K):
-    """
-    fragmented transcripts can manifest as 0-degree dangling ends
-    of the overlap graph. this function connects these ends to the
-    'source' and/or 'sink' nodes
-    """
-    source = K.graph['source']
-    sink = K.graph['sink']
-    # connect all nodes with degree zero to the source/sink nodes
-    # to account for fragmentation in the kmer graph when k > 2
-    edges_to_add = []
-    for n in K.nodes_iter():
-        if (n == source) or (n == sink):
-            continue
-        if K.in_degree(n) == 0:
-            edges_to_add.append((source, n))
-        if K.out_degree(n) == 0:
-            edges_to_add.append((n, sink))
-    # connect kmers
-    for u, v in edges_to_add:
-        K.add_edge(u, v)
+def get_unreachable_kmers(K, source=None, sink=None):
+    '''
+    Path graphs created with k > 2 can yield fragmented paths. Test for
+    these by finding unreachable kmers from source or sink
+    '''
+    if source is None:
+        source = K.graph['source']
+    if sink is None:
+        sink = K.graph['sink']
+    allnodes = set(K)
+    # unreachable from source
+    a = allnodes - set(nx.shortest_path_length(K, source=source).keys())
+    # unreachable from sink
+    b = allnodes - set(nx.shortest_path_length(K, target=sink).keys())
+    return a | b
+
+
+def is_graph_valid(K):
+    if SOURCE not in K:
+        return False
+    if SINK not in K:
+        return False
+    return nx.has_path(K, SOURCE, SINK)
 
 
 def get_kmers(path, k):
@@ -182,6 +160,60 @@ def get_path(sgraph, t):
     if sgraph.strand == Strand.NEG:
         nodes.reverse()
     return tuple(nodes)
+
+
+def get_node_lengths(sgraph, t):
+    return [(n[1]-n[0]) for n in split_transfrag(t, sgraph.node_bounds)]
+
+
+def _constrain_k(node_lengths, frag_length, kmin):
+    path_length = 0
+    path_k = 0
+    i = 0
+    j = 0
+    while i < len(node_lengths):
+        while j < len(node_lengths):
+            if (path_length >= frag_length) and ((j - i) >= kmin):
+                break
+            path_length += node_lengths[j]
+            j += 1
+        path_k = max(path_k, (j - i))
+        if j == len(node_lengths):
+            break
+        path_length -= node_lengths[i]
+        i += 1
+    return path_k
+
+
+def choose_k_by_frag_length(sgraph, frag_length, kmin=1):
+    max_frag_length_nodes = 1
+    for t in sgraph.itertransfrags():
+        node_lengths = \
+            [(n[1]-n[0]) for n in split_transfrag(t, sgraph.node_bounds)]
+        frag_length_nodes = _constrain_k(node_lengths, frag_length, kmin)
+        max_frag_length_nodes = max(max_frag_length_nodes, frag_length_nodes)
+    return max_frag_length_nodes
+
+
+def choose_kmax(sgraph, frag_length=400, kmax=0):
+    user_kmax = kmax
+    kmax_path = 1
+    kmax_frag_length = 1
+    kmin = 1
+    for t in sgraph.itertransfrags():
+        node_lengths = get_node_lengths(sgraph, t)
+        kmax_path = max(kmax_path, len(node_lengths))
+        kmax_frag_length = max(kmax_frag_length,
+                               _constrain_k(node_lengths, frag_length, kmin))
+    # upper bound on kmax is longest path
+    kmax = kmax_path
+    if user_kmax > 0:
+        # user can force a specific kmax (for debugging/testing purposes)
+        kmax = min(user_kmax, kmax)
+    elif frag_length > 0:
+        # bound kmax to accommodate a minimum fragment size
+        kmax = min(kmax, kmax_frag_length)
+    return kmax
 
 
 def create_path_graph(sgraph, k):
@@ -253,12 +285,61 @@ def create_path_graph(sgraph, k):
     # add new paths
     for path, expr in kmer_paths:
         add_path(K, path, expr)
-    # connect all kmer nodes with degree zero to the source/sink node
-    # to account for fragmentation in the kmer graph when k > 2
-    connect_dangling_ends(K)
+    # remove nodes that are unreachable from the source or sink, these occur
+    # due to fragmentation when k > 2
+    unreachable = []
+    for kmer in get_unreachable_kmers(K, SOURCE, SINK):
+        unreachable.append((kmer, K.node[kmer][KMER_EXPR]))
+        K.remove_node(kmer)
+    # graph is invalid if there is no path from source to sink
+    valid = is_graph_valid(K)
     # cleanup
-    del kmer_id_map
-    return K, lost_paths
+    return K, lost_paths, unreachable, valid
+
+
+def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
+                              loss_threshold=0.10, stats_fh=None):
+    '''
+    create a path graph from the original splice graph using paths of length
+    'k' for assembly. The parameter 'k' will be chosen by maximizing the
+    number of reachable nodes in the k-graph while tolerating at most
+    'loss_threshold' percent of total expression of transfrags that cannot
+    be included in the graph.
+    '''
+    # find upper bound to k
+    kmax = choose_kmax(sgraph, frag_length, kmax)
+    sgraph_id_str = '%s:%d-%d[%s]' % (sgraph.chrom, sgraph.start, sgraph.end,
+                                      Strand.to_gtf(sgraph.strand))
+    best_k = None
+    best_graph = None
+    for k in xrange(kmax, 0, -1):
+        K, lost_paths, unreachable, valid = create_path_graph(sgraph, k)
+        reachable_expr = sum(d[KMER_EXPR] for n, d in K.nodes_iter(data=True))
+        # compute statistics
+        lost_path_expr = 0.0
+        for path, expr in lost_paths:
+            num_kmers = max(1, len(path) - k + 1)
+            lost_path_expr += num_kmers * expr
+        unreachable_expr = sum(x for kmer, x in unreachable)
+        lost_expr = lost_path_expr + unreachable_expr
+        tot_expr = reachable_expr + lost_path_expr + unreachable_expr
+        lost_frac = 0.0 if tot_expr == 0 else lost_expr / tot_expr
+        if stats_fh is not None:
+            fields = [sgraph_id_str, k, kmax, len(sgraph.transfrags),
+                      len(lost_paths), len(K), len(unreachable),
+                      '%.3f' % tot_expr, '%.3f' % lost_expr,
+                      '%.3f' % lost_path_expr, '%.3f' % unreachable_expr,
+                      '%.3f' % lost_frac, int(valid)]
+            print >>stats_fh, '\t'.join(map(str, fields))
+        if not valid:
+            continue
+        if lost_frac > loss_threshold:
+            continue
+        if (best_k is None) or (len(K) > len(best_graph)):
+            best_k = k
+            best_graph = K
+    assert best_k is not None
+    return best_graph, best_k
 
 
 def reconstruct_path(kmer_path, id_kmer_map, strand):

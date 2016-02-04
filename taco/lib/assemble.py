@@ -1,6 +1,7 @@
 '''
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
+import os
 import logging
 import collections
 from multiprocessing import Process, JoinableQueue, Value, Lock
@@ -9,8 +10,8 @@ from gtf import GTF
 from base import Strand
 from transfrag import Transfrag
 from locus import Locus
-from path_graph import choose_k, create_path_graph, smooth_graph, \
-    reconstruct_path, NODE_EXPR
+from path_graph import smooth_graph, reconstruct_path, KMER_EXPR, \
+    create_optimal_path_graph
 from path_finder import find_suboptimal_paths
 from bx.cluster import ClusterTree
 
@@ -57,11 +58,14 @@ class Config(object):
         self.node_gtf_file = None
         self.assembly_gtf_file = None
         self.assembly_bed_file = None
-        self.min_path_length = 400
         self.change_point = True
         self.change_point_pvalue = 0.05
         self.change_point_fold_change = 0.85
         self.change_point_trim = True
+        self.max_frag_length = 400
+        self.kmax = 0
+        self.loss_threshold = 0.10
+        self.path_graph_stats_file = None
         self.frac_isoform = 0.01
         self.max_isoforms = 100
         self.guided_strand = False
@@ -161,12 +165,13 @@ def annotate_gene_and_tss_ids(isoforms, strand,
             isoforms[i].gene_id = gene_id
 
 
-def assemble_isoforms(sgraph, min_path_length, frac_isoform, max_isoforms):
-    # choose a k-mer size 'k' based on a desired minimum path length
-    k = choose_k(sgraph.itertransfrags(),
-                 sgraph.node_bounds,
-                 min_path_length=min_path_length)
-    K, lost_paths = create_path_graph(sgraph, k)
+def assemble_isoforms(sgraph, config):
+    # create a path graph from the splice graph
+    K, k = create_optimal_path_graph(sgraph,
+                                     frag_length=config.max_frag_length,
+                                     kmax=config.kmax,
+                                     loss_threshold=config.loss_threshold,
+                                     stats_fh=config.path_graph_stats_fh)
     # smooth kmer graph
     smooth_graph(K)
     # find up to 'max_isoforms' paths through graph
@@ -175,12 +180,12 @@ def assemble_isoforms(sgraph, min_path_length, frac_isoform, max_isoforms):
                   '(%d nodes) source_expr=%f' %
                   (sgraph.chrom, sgraph.start, sgraph.end,
                    Strand.to_gtf(sgraph.strand), k, len(K),
-                   K.node[source_node][NODE_EXPR]))
+                   K.node[source_node][KMER_EXPR]))
     isoforms = []
     id_kmer_map = K.graph['id_kmer_map']
     for kmer_path, expr in \
         find_suboptimal_paths(K, K.graph['source'], K.graph['sink'],
-                              frac_isoform, max_isoforms):
+                              config.frac_isoform, config.max_isoforms):
         # reconstruct path
         path = reconstruct_path(kmer_path, id_kmer_map, sgraph.strand)
         logging.debug("\texpr=%f length=%d" % (expr, len(path)))
@@ -204,8 +209,7 @@ def assemble_gene(sgraph, locus_id_str, config):
         # must recreate splice graph after finding change points
         sgraph.recreate()
     # run isoform path finding algorithm
-    isoforms = assemble_isoforms(sgraph, config.min_path_length,
-                                 config.frac_isoform, config.max_isoforms)
+    isoforms = assemble_isoforms(sgraph, config)
     # determine gene ids and tss ids
     annotate_gene_and_tss_ids(isoforms, sgraph.strand,
                               config.gene_id_value_obj,
@@ -298,6 +302,14 @@ def assemble(**kwargs):
                                                   config.chrom_sizes_file)
     # setup node gtf file
     config.node_gtf_fh = open(config.node_gtf_file, 'w')
+
+    # path graph stats file
+    config.path_graph_stats_fh = open(config.path_graph_stats_file, 'w')
+    fields = ['locus', 'k', 'kmax', 'transfrags', 'lost', 'kmers',
+              'unreachable', 'tot_expr', 'lost_expr', 'lost_path_expr',
+              'unreachable_expr', 'lost_frac', 'valid']
+    print >>config.path_graph_stats_fh, '\t'.join(fields)
+
     # assembly gtf and bed files
     config.assembly_gtf_fh = open(config.assembly_gtf_file, 'w')
     config.bed_fh = open(config.assembly_bed_file, 'w')
@@ -316,6 +328,8 @@ def assemble(**kwargs):
     # close assembly files
     config.assembly_gtf_fh.close()
     config.bed_fh.close()
+    # close path graph stats file
+    config.path_graph_stats_fh.close()
     # close node file
     config.node_gtf_fh.close()
     # close expression

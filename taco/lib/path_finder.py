@@ -5,7 +5,7 @@ import logging
 import collections
 import networkx as nx
 
-from path_graph import NODE_EXPR
+from path_graph import KMER_EXPR
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -21,7 +21,7 @@ __status__ = "Development"
 MIN_SCORE = 1.0e-10
 
 # for dynamic programming algorithm
-TMP_NODE_EXPR = 'tmpns'
+TMP_KMER_EXPR = 'tmpns'
 PATH_MIN_SCORE = 'pmin'
 PATH_PREV = 'pprev'
 
@@ -37,7 +37,7 @@ def init_tmp_attributes(G):
     # manipulation them in the algorithm and create path attributes
     # for dynamic programming
     for n, d in G.nodes_iter(data=True):
-        d[TMP_NODE_EXPR] = d[NODE_EXPR]
+        d[TMP_KMER_EXPR] = d[KMER_EXPR]
         d[PATH_MIN_SCORE] = MIN_SCORE
         d[PATH_PREV] = None
 
@@ -47,7 +47,7 @@ def clear_tmp_attributes(G):
     remove node attributes that are added to the graph temporarily
     '''
     for n, d in G.nodes_iter(data=True):
-        del d[TMP_NODE_EXPR]
+        del d[TMP_KMER_EXPR]
         del d[PATH_MIN_SCORE]
         del d[PATH_PREV]
 
@@ -69,7 +69,7 @@ def dynprog_search(G, source):
     """
     # setup initial path attributes
     reset_path_attributes(G)
-    G.node[source][PATH_MIN_SCORE] = G.node[source][TMP_NODE_EXPR]
+    G.node[source][PATH_MIN_SCORE] = G.node[source][TMP_KMER_EXPR]
     # topological sort allows each node to be visited exactly once
     queue = collections.deque(nx.topological_sort(G))
     while queue:
@@ -77,7 +77,7 @@ def dynprog_search(G, source):
         path_min_score = G.node[u][PATH_MIN_SCORE]
         for v in G.successors_iter(u):
             v_attrs = G.node[v]
-            v_score = v_attrs[TMP_NODE_EXPR]
+            v_score = v_attrs[TMP_KMER_EXPR]
             # compute minimum score that would occur if path
             # traversed through node 'v'
             new_min_score = imin2(path_min_score, v_score)
@@ -121,8 +121,8 @@ def subtract_path(G, path, score):
     for i in xrange(len(path)):
         u = path[i]
         d = G.node[u]
-        d[TMP_NODE_EXPR] = imax2(MIN_SCORE,
-                                 d[TMP_NODE_EXPR] - score)
+        d[TMP_KMER_EXPR] = imax2(MIN_SCORE,
+                                 d[TMP_KMER_EXPR] - score)
 
 
 def find_suboptimal_paths(G, source, sink, fraction_major_path=1e-3,
@@ -142,10 +142,10 @@ def find_suboptimal_paths(G, source, sink, fraction_major_path=1e-3,
     # that arise if the heuristic assumptions of the algorithm fail
     path_results = collections.OrderedDict()
     # define threshold score to stop producing suboptimal paths
-    max_score = G.node[source][NODE_EXPR]
+    max_score = G.node[source][KMER_EXPR]
     if max_score < MIN_SCORE:
         return []
-    lowest_score = G.node[source][NODE_EXPR] * fraction_major_path
+    lowest_score = G.node[source][KMER_EXPR] * fraction_major_path
     lowest_score = max(MIN_SCORE, lowest_score)
     # find highest scoring path
     path, score = find_path(G, source, sink)

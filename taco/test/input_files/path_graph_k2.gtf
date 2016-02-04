@@ -1,0 +1,9 @@
+chr1	Cufflinks	transcript	817656	819514	1000.0	+	.	expr "0.1824839868"; transcript_id "5.T37"; ref "0"; sample_id 5;
+chr1	Cufflinks	exon	817656	818202	1000.0	+	.	transcript_id "5.T37";
+chr1	Cufflinks	exon	818723	819514	1000.0	+	.	transcript_id "5.T37";
+chr1	Cufflinks	transcript	819365	822685	1000.0	+	.	expr "0.2605613785"; transcript_id "11.T41"; ref "0"; sample_id 11;
+chr1	Cufflinks	exon	819365	820869	1000.0	+	.	transcript_id "11.T41";
+chr1	Cufflinks	transcript	820593	823277	1000.0	+	.	expr "0.1012426451"; transcript_id "10.T17"; ref "0"; sample_id 10;
+chr1	Cufflinks	exon	820593	821508	1000.0	+	.	transcript_id "10.T17";
+chr1	Cufflinks	exon	820905	822685	1000.0	+	.	transcript_id "11.T41";
+chr1	Cufflinks	exon	822965	823277	1000.0	+	.	transcript_id "10.T17";

@@ -35,12 +35,14 @@ class Args:
     GTF_EXPR_ATTR = 'TPM'
     MIN_FRAG_LENGTH = 200
     MAX_FRAG_LENGTH = 400
-    FRAC_ISOFORM = 0.01
-    MAX_ISOFORMS = 100
     CHANGE_POINT = True
     CHANGE_POINT_PVALUE = 0.05
     CHANGE_POINT_FOLD_CHANGE = 0.80
     CHANGE_POINT_TRIM = True
+    KMAX = 0
+    LOSS_THRESHOLD = 0.10
+    FRAC_ISOFORM = 0.01
+    MAX_ISOFORMS = 100
     RESUME = False
     OUTPUT_DIR = 'taco'
     PROG = 'taco'
@@ -126,6 +128,18 @@ class Args:
                             help='Enable guided assembly (requires a '
                             'reference GTF to be specified using '
                             '--ref-gtf)')
+        parser.add_argument('--kmax', dest='kmax', type=int,
+                            metavar='k',
+                            default=Args.KMAX,
+                            help='Maximize k-mer size of path graph '
+                            '[default=%(default)s]')
+        parser.add_argument('--loss-threshold', type=float,
+                            dest='loss_threshold',
+                            metavar='X',
+                            default=Args.LOSS_THRESHOLD,
+                            help='Tolerate loss of X (0.0-1.0) fraction of '
+                            'total gene expression while optimizing the '
+                            'assembly parameter "k" [default=%(default)s]')
         parser.add_argument('--frac-isoform',
                             dest='frac_isoform', type=float,
                             metavar='X',
@@ -185,6 +199,8 @@ class Args:
         func(fmt.format('GTF expression attribute:', args.gtf_expr_attr))
         func(fmt.format('min fragment length:', args.min_frag_length))
         func(fmt.format('max fragment length:', args.max_frag_length))
+        func(fmt.format('loss threshold:', args.loss_threshold))
+        func(fmt.format('kmax:', args.kmax))
         func(fmt.format('fraction isoform:', args.frac_isoform))
         func(fmt.format('max isoforms:', args.max_isoforms))
         return
@@ -232,6 +248,10 @@ class Args:
                 parser.error("frac_isoform out of range (0.0-1.0)")
             if (args.max_isoforms < 1):
                 parser.error("max_isoforms <= 0")
+            if not (0 <= args.loss_threshold <= 1):
+                parser.error("loss_threshold not in range (0.0-1.0)")
+            if args.kmax < 0:
+                parser.error("kmax must be >= 0")
             if (args.change_point):
                 if not (0.0 <= args.change_point_pvalue <= 1.0):
                     parser.error('change point pvalue invalid')
@@ -264,6 +284,7 @@ class Results(object):
     BEDGRAPH_UNRESOLVED_PREFIX = 'loci.unresolved'
     BEDGRAPH_RESOLVED_PREFIX = 'loci.resolved'
     SPLICE_BED_FILE = 'splice_junctions.bed'
+    PATH_GRAPH_STATS_FILE = 'path_graph_stats.txt'
     ASSEMBLY_GTF_FILE = 'assembly.gtf'
     ASSEMBLY_BED_FILE = 'assembly.bed'
 
@@ -295,6 +316,8 @@ class Results(object):
             list(Locus.get_bedgraph_file_names(file_prefix))
         self.splice_bed_file = \
             os.path.join(output_dir, Results.SPLICE_BED_FILE)
+        self.path_graph_stats_file = \
+            os.path.join(output_dir, Results.PATH_GRAPH_STATS_FILE)
         self.assembly_gtf_file = \
             os.path.join(output_dir, Results.ASSEMBLY_GTF_FILE)
         self.assembly_bed_file = \
@@ -406,11 +429,14 @@ class Run(object):
                  node_gtf_file=r.node_gtf_file,
                  assembly_gtf_file=r.assembly_gtf_file,
                  assembly_bed_file=r.assembly_bed_file,
-                 min_path_length=a.max_frag_length,
+                 path_graph_stats_file=r.path_graph_stats_file,
                  change_point=a.change_point,
                  change_point_pvalue=a.change_point_pvalue,
                  change_point_fold_change=a.change_point_fold_change,
                  change_point_trim=a.change_point_trim,
+                 max_frag_length=a.max_frag_length,
+                 kmax=a.kmax,
+                 loss_threshold=a.loss_threshold,
                  frac_isoform=a.frac_isoform,
                  max_isoforms=a.max_isoforms,
                  guided_strand=a.guided_strand,

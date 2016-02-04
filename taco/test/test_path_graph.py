@@ -2,43 +2,97 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import networkx as nx
+import matplotlib.pyplot as plt
 
 from taco.lib.base import Exon, Strand
 from taco.lib.transfrag import Transfrag
 
 from taco.lib.splice_graph import SpliceGraph
-from taco.lib.path_graph import choose_k, create_path_graph, get_kmers, \
-    add_path, SOURCE, SINK, smooth_graph
+from taco.lib.path_graph import choose_k_by_frag_length, create_path_graph, \
+    get_kmers, add_path, SOURCE, SINK, smooth_graph, get_unreachable_kmers, \
+    get_path, create_optimal_path_graph
 
 from taco.test.base import read_single_locus
+
+
+def test_reachability():
+    source = -1
+    sink = -2
+    G = nx.DiGraph()
+    nx.path_graph(10, create_using=G)
+    G.add_edge(source, 0)
+    G.add_edge(9, sink)
+    assert len(get_unreachable_kmers(G, source, sink)) == 0
+    # unreachable from sink
+    G.add_edges_from([(2, 20), (20, 21)])
+    unreachable = get_unreachable_kmers(G, source, sink)
+    assert unreachable == set([20, 21])
+    # unreachable from source
+    G.add_edges_from([(33, 32), (32, 31), (31, 9)])
+    unreachable = get_unreachable_kmers(G, source, sink)
+    assert unreachable == set([20, 21, 33, 32, 31])
+
+
+def test_unreachable_kmers():
+    t_dict, locus = read_single_locus('path_graph_k2.gtf')
+    sgraph = SpliceGraph.create(t_dict.values())
+    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k=2)
+    assert not valid
+    assert len(K) == 0
+    assert len(unreachable) == 8
+
+    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k=1)
+    assert len(lost_paths) == 0
+    assert len(unreachable) == 0
+    assert valid
+    assert len(K) == 8
+
+    K, k = create_optimal_path_graph(sgraph, frag_length=0, kmax=0,
+                                     loss_threshold=1.0)
+    assert k == 1
+    assert len(K) == 8
+    # print 'K', K.nodes()
+    # print 'lost', lost_paths
+    # print 'unreachable', unreachable
+    # print 'valid', valid
+    #
+    # print 'start stop', sgraph.get_start_stop_nodes()
+    # for t in sgraph.itertransfrags():
+    #     print t._id, t.is_ref, t.expr, t.exons, get_path(sgraph, t)
+    #
+    # for n in K:
+    #     if n < 0: continue
+    #     print 'node', n, 'kmer', K.graph['id_kmer_map'][n], K.node[n]['expr']
+    #
+    # nx.draw_networkx(K, with_labels=True)
+    # plt.show()
 
 
 def test_choose_k_1():
     A = Transfrag(chrom='chr1', strand=Strand.POS,
                   exons=[Exon(0, 100), Exon(200, 300), Exon(400, 500)],
                   _id='A')
-    SG = SpliceGraph.create([A])
-    node_bounds = SG.node_bounds
+    sgraph = SpliceGraph.create([A])
     # case does not reach min frag length
-    k = choose_k([A], node_bounds, min_path_length=400, kmin=1)
+    k = choose_k_by_frag_length(sgraph, 400, 1)
     assert k == 3
     # case reaches min frag length
-    k = choose_k([A], node_bounds, min_path_length=300, kmin=1)
+    k = choose_k_by_frag_length(sgraph, 300, 1)
     assert k == 3
-    k = choose_k([A], node_bounds, min_path_length=250, kmin=1)
+    k = choose_k_by_frag_length(sgraph, 250, 1)
     assert k == 3
     # case reaches frag length with nodes to spare
-    k = choose_k([A], node_bounds, min_path_length=200, kmin=1)
+    k = choose_k_by_frag_length(sgraph, 200, 1)
     assert k == 2
     # case reaches frag length with nodes to spare
-    k = choose_k([A], node_bounds, min_path_length=100, kmin=1)
+    k = choose_k_by_frag_length(sgraph, 100, 1)
     assert k == 1
     # enforce kmin
-    k = choose_k([A], node_bounds, min_path_length=100, kmin=2)
+    k = choose_k_by_frag_length(sgraph, 100, kmin=2)
     assert k == 2
-    k = choose_k([A], node_bounds, min_path_length=100, kmin=3)
+    k = choose_k_by_frag_length(sgraph, 100, kmin=3)
     assert k == 3
-    k = choose_k([A], node_bounds, min_path_length=100, kmin=5)
+    k = choose_k_by_frag_length(sgraph, 100, kmin=5)
     assert k == 3
 
 
@@ -61,15 +115,14 @@ def test_choose_k_2():
                          Exon(500, 600),
                          Exon(1000, 1100)],
                   _id='B')
-    SG = SpliceGraph.create([A, B])
-    node_bounds = SG.node_bounds
-    k = choose_k([A, B], node_bounds, min_path_length=200, kmin=1)
+    sgraph = SpliceGraph.create([A, B])
+    k = choose_k_by_frag_length(sgraph, frag_length=200, kmin=1)
     assert k == 11
-    k = choose_k([A, B], node_bounds, min_path_length=100, kmin=1)
+    k = choose_k_by_frag_length(sgraph, frag_length=100, kmin=1)
     assert k == 10
-    k = choose_k([A, B], node_bounds, min_path_length=1, kmin=1)
+    k = choose_k_by_frag_length(sgraph, frag_length=1, kmin=1)
     assert k == 1
-    k = choose_k([A, B], node_bounds, min_path_length=1, kmin=3)
+    k = choose_k_by_frag_length(sgraph, frag_length=1, kmin=3)
     assert k == 3
 
     B = Transfrag(chrom='chr1', strand=Strand.POS,
@@ -78,17 +131,16 @@ def test_choose_k_2():
                          Exon(500, 600),
                          Exon(1000, 1100)],
                   _id='B')
-    SG = SpliceGraph.create([A, B])
-    node_bounds = SG.node_bounds
-    k = choose_k([A, B], node_bounds, min_path_length=200)
+    sgraph = SpliceGraph.create([A, B])
+    k = choose_k_by_frag_length(sgraph, frag_length=200)
     assert k == 12
-    k = choose_k([A, B], node_bounds, min_path_length=100)
+    k = choose_k_by_frag_length(sgraph, frag_length=100)
     assert k == 11
-    k = choose_k([A, B], node_bounds, min_path_length=50)
+    k = choose_k_by_frag_length(sgraph, frag_length=50)
     assert k == 6
-    k = choose_k([A, B], node_bounds, min_path_length=1, kmin=1)
+    k = choose_k_by_frag_length(sgraph, frag_length=1, kmin=1)
     assert k == 1
-    k = choose_k([A, B], node_bounds, min_path_length=1, kmin=2)
+    k = choose_k_by_frag_length(sgraph, frag_length=1, kmin=2)
     assert k == 2
 
 
@@ -105,15 +157,14 @@ def test_choose_k_3():
                          Exon(160000, 170000),
                          Exon(180000, 190000)],
                   _id='A')
-    SG = SpliceGraph.create([A])
-    node_bounds = SG.node_bounds
-    k = choose_k([A], node_bounds, min_path_length=400, kmin=1)
+    sgraph = SpliceGraph.create([A])
+    k = choose_k_by_frag_length(sgraph, frag_length=400, kmin=1)
     assert k == 1
-    k = choose_k([A], node_bounds, min_path_length=400, kmin=2)
+    k = choose_k_by_frag_length(sgraph, frag_length=400, kmin=2)
     assert k == 2
-    k = choose_k([A], node_bounds, min_path_length=20000, kmin=2)
+    k = choose_k_by_frag_length(sgraph, frag_length=20000, kmin=2)
     assert k == 2
-    k = choose_k([A], node_bounds, min_path_length=100000, kmin=2)
+    k = choose_k_by_frag_length(sgraph, frag_length=100000, kmin=2)
     assert k == 10
 
 
@@ -132,7 +183,7 @@ def test_path_graph1():
     paths = [ABCDE, ACE, ABCE, ACDE]
     # create path graph k = 2
     k = 2
-    G1, lost_paths = create_path_graph(SG, k)
+    G1, lost_paths, unreachable, valid = create_path_graph(SG, k)
     G2 = nx.DiGraph()
     for path in paths:
         kmers = list(get_kmers(path, k))
@@ -145,9 +196,9 @@ def test_path_graph2():
     sgraph = SpliceGraph.create(t_dict.values())
 
     # trivial case without additional stops or starts
-    k = choose_k(sgraph.transfrags, sgraph.node_bounds)
+    k = choose_k_by_frag_length(sgraph, frag_length=400, kmin=2)
     assert k == 1
-    K, lost_paths = create_path_graph(sgraph, k)
+    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k)
     kmer_id_map = dict((v, k) for k, v in K.graph['id_kmer_map'].iteritems())
     assert len(lost_paths) == 0
     n = kmer_id_map[(Exon(0, 100),)]
@@ -158,7 +209,7 @@ def test_path_graph2():
     # add a stop site
     sgraph.stop_sites.add(50)
     sgraph.recreate()
-    K, lost_paths = create_path_graph(sgraph, k=2)
+    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k=2)
     assert len(lost_paths) == 0
     kmer_id_map = dict((v, k) for k, v in K.graph['id_kmer_map'].iteritems())
     n1 = kmer_id_map[(Exon(start=0, end=50), Exon(start=50, end=100))]
@@ -178,7 +229,7 @@ def test_path_graph2():
     sgraph.start_sites.add(50)
     sgraph.stop_sites.add(50)
     sgraph.recreate()
-    K, lost_paths = create_path_graph(sgraph, k=2)
+    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k=2)
     smooth_graph(K)
     kmer_id_map = dict((v, k) for k, v in K.graph['id_kmer_map'].iteritems())
     n1 = kmer_id_map[(Exon(start=0, end=50), Exon(start=50, end=100))]
