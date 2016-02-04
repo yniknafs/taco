@@ -92,7 +92,7 @@ class Args:
                             metavar='<float 0.0-1.0>',
                             help='Mann-Whitney-U p-value threshold for '
                             'calling change points [default=%(default)s]')
-        parser.add_argument('--change-point-fold-change',
+        parser.add_argument('--change-point-fold-change', type=float,
                             dest='change_point_fold_change',
                             default=Args.CHANGE_POINT_FOLD_CHANGE,
                             metavar='<float 0.0-1.0>',
