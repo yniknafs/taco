@@ -86,7 +86,7 @@ class Args:
         parser.add_argument('--no-change-point', dest='change_point',
                             action='store_false',
                             help='Disable change point detection')
-        parser.add_argument('--change-point-pvalue',
+        parser.add_argument('--change-point-pvalue', type=float,
                             dest='change_point_pvalue',
                             default=Args.CHANGE_POINT_PVALUE,
                             metavar='<float 0.0-1.0>',
