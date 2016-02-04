@@ -240,10 +240,10 @@ class Args:
                              (args.chrom_sizes_file))
             args.chrom_sizes_file = os.path.abspath(args.chrom_sizes_file)
 
-            if args.min_frag_length <= 0:
-                parser.error("min_transcript_length <= 0")
-            if args.max_frag_length <= 0:
-                parser.error("max_frag_length <= 0")
+            if args.min_frag_length < 0:
+                parser.error("min_frag_length < 0")
+            if args.max_frag_length < 0:
+                parser.error("max_frag_length < 0")
             if (args.frac_isoform <= 0) or (args.frac_isoform > 1):
                 parser.error("frac_isoform out of range (0.0-1.0)")
             if (args.max_isoforms < 1):
