@@ -131,9 +131,9 @@ def get_unreachable_kmers(K, source=None, sink=None):
     these by finding unreachable kmers from source or sink
     '''
     if source is None:
-        source = K.graph['source']
+        source = SOURCE
     if sink is None:
-        sink = K.graph['sink']
+        sink = SINK
     allnodes = set(K)
     # unreachable from source
     a = allnodes - set(nx.shortest_path_length(K, source=source).keys())
@@ -220,8 +220,6 @@ def create_path_graph(sgraph, k):
     '''create kmer graph from partial paths'''
     # initialize path graph
     K = nx.DiGraph()
-    K.graph['source'] = SOURCE
-    K.graph['sink'] = SINK
     K.add_node(SOURCE, attr_dict=init_node_attrs())
     K.add_node(SINK, attr_dict=init_node_attrs())
     # find all beginning/end nodes in splice graph
@@ -231,7 +229,7 @@ def create_path_graph(sgraph, k):
     id_kmer_map = {}
     kmer_paths = []
     current_id = 0
-    short_partial_path_dict = collections.defaultdict(lambda: [])
+    short_transfrag_dict = collections.defaultdict(lambda: [])
     for t in sgraph.itertransfrags():
         # get nodes
         path = get_path(sgraph, t)
@@ -241,7 +239,7 @@ def create_path_graph(sgraph, k):
         full_length = is_start and is_end
         if (len(path) < k) and (not full_length):
             # save fragmented short paths
-            short_partial_path_dict[len(path)].append((path, t.expr))
+            short_transfrag_dict[len(path)].append((t, path))
             continue
         # convert to path of kmers
         kmer_path = []
@@ -266,35 +264,67 @@ def create_path_graph(sgraph, k):
         if is_end:
             kmer_path.append(SINK)
         kmer_paths.append((kmer_path, t.expr))
-    # store mapping from kmer_id to subpath tuple
-    K.graph['id_kmer_map'] = id_kmer_map
+
+    # add paths to graph
     for path, expr in kmer_paths:
         add_path(K, path, expr)
+
     # try to add short paths to graph if they are exact subpaths of
     # existing kmers
     kmer_paths = []
-    lost_paths = []
-    for ksmall, short_partial_paths in short_partial_path_dict.iteritems():
+    L = nx.Graph()
+    num_lost_transfrags = 0
+    for ksmall, short_transfrag_paths in short_transfrag_dict.iteritems():
         kmer_hash = hash_kmers(id_kmer_map, k, ksmall)
-        for path, expr in short_partial_paths:
+        for t, path in short_transfrag_paths:
             matching_paths = \
-                list(find_short_path_kmers(kmer_hash, K, path, expr))
+                list(find_short_path_kmers(kmer_hash, K, path, t.expr))
             if len(matching_paths) == 0:
-                lost_paths.append((path, expr))
+                # maintain graph of lost nodes
+                num_lost_transfrags += 1
+                for n in path:
+                    if n not in L:
+                        L.add_node(n, transfrag=True, kmer=False)
+                    else:
+                        L.node[n]['transfrag'] = True
             kmer_paths.extend(matching_paths)
+
     # add new paths
     for path, expr in kmer_paths:
         add_path(K, path, expr)
+
     # remove nodes that are unreachable from the source or sink, these occur
     # due to fragmentation when k > 2
-    unreachable = []
+    num_lost_kmers = 0
     for kmer in get_unreachable_kmers(K, SOURCE, SINK):
-        unreachable.append((kmer, K.node[kmer][KMER_EXPR]))
+        if (kmer == SOURCE) or (kmer == SINK):
+            continue
+        num_lost_kmers += 1
+        expr = K.node[kmer][KMER_EXPR]
+        for n in id_kmer_map[kmer]:
+            if n not in L:
+                L.add_node(n, transfrag=False, kmer=True)
+            else:
+                L.node[n]['kmer'] = True
         K.remove_node(kmer)
+    # lost nodes do not appear in K
+    reachable_nodes = set()
+    for kmer in K.nodes_iter():
+        if (kmer == SOURCE) or (kmer == SINK):
+            continue
+        reachable_nodes.update(id_kmer_map[kmer])
+    L.remove_nodes_from(reachable_nodes)
     # graph is invalid if there is no path from source to sink
     valid = is_graph_valid(K)
-    # cleanup
-    return K, lost_paths, unreachable, valid
+    # add graph attributes
+    K.graph['source'] = SOURCE
+    K.graph['sink'] = SINK
+    K.graph['id_kmer_map'] = id_kmer_map
+    K.graph['valid'] = valid
+    K.graph['loss_graph'] = L
+    K.graph['num_lost_kmers'] = num_lost_kmers
+    K.graph['num_lost_transfrags'] = num_lost_transfrags
+    return K
 
 
 def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
@@ -303,42 +333,46 @@ def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
     create a path graph from the original splice graph using paths of length
     'k' for assembly. The parameter 'k' will be chosen by maximizing the
     number of reachable nodes in the k-graph while tolerating at most
-    'loss_threshold' percent of total expression of transfrags that cannot
-    be included in the graph.
+    'loss_threshold' percent of expression.
     '''
     # find upper bound to k
     kmax = choose_kmax(sgraph, frag_length, kmax)
     sgraph_id_str = '%s:%d-%d[%s]' % (sgraph.chrom, sgraph.start, sgraph.end,
                                       Strand.to_gtf(sgraph.strand))
-    best_k = None
+    tot_expr = sum(sgraph.get_expr_data(*n).mean() for n in sgraph.G)
+    best_k = 0
     best_graph = None
     for k in xrange(kmax, 0, -1):
-        K, lost_paths, unreachable, valid = create_path_graph(sgraph, k)
-        reachable_expr = sum(d[KMER_EXPR] for n, d in K.nodes_iter(data=True))
-        # compute statistics
-        lost_path_expr = 0.0
-        for path, expr in lost_paths:
-            num_kmers = max(1, len(path) - k + 1)
-            lost_path_expr += num_kmers * expr
-        unreachable_expr = sum(x for kmer, x in unreachable)
-        lost_expr = lost_path_expr + unreachable_expr
-        tot_expr = reachable_expr + lost_path_expr + unreachable_expr
-        lost_frac = 0.0 if tot_expr == 0 else lost_expr / tot_expr
+        K = create_path_graph(sgraph, k)
+        valid = K.graph['valid']
+        L = K.graph['loss_graph']
+        lost_expr = sum(sgraph.get_expr_data(*n).mean() for n in L)
+        lost_expr_frac = 0.0 if tot_expr == 0 else lost_expr / tot_expr
+        lost_node_frac = len(L) / float(len(sgraph.G))
+        logging.debug('%s k=%d kmax=%d t=%d n=%d kmers=%d lost_transfrags=%d '
+                      'lost_nodes=%d lost_kmers=%d tot_expr=%.3f '
+                      'lost_expr=%.3f lost_expr_frac=%.3f '
+                      'lost_node_frac=%.3f valid=%d' %
+                      (sgraph_id_str, k, kmax, len(sgraph.transfrags),
+                       len(sgraph.G), len(K), K.graph['num_lost_transfrags'],
+                       len(L), K.graph['num_lost_kmers'], tot_expr, lost_expr,
+                       lost_expr_frac, lost_node_frac, int(valid)))
         if stats_fh is not None:
-            fields = [sgraph_id_str, k, kmax, len(sgraph.transfrags),
-                      len(lost_paths), len(K), len(unreachable),
+            fields = (sgraph_id_str, k, kmax, len(sgraph.transfrags),
+                      len(sgraph.G), len(K), K.graph['num_lost_transfrags'],
+                      len(L), K.graph['num_lost_kmers'],
                       '%.3f' % tot_expr, '%.3f' % lost_expr,
-                      '%.3f' % lost_path_expr, '%.3f' % unreachable_expr,
-                      '%.3f' % lost_frac, int(valid)]
+                      '%.3f' % lost_expr_frac, '%.3f' % lost_node_frac,
+                      int(valid))
             print >>stats_fh, '\t'.join(map(str, fields))
         if not valid:
             continue
-        if lost_frac > loss_threshold:
+        if lost_expr_frac > loss_threshold:
             continue
-        if (best_k is None) or (len(K) > len(best_graph)):
+        if (best_graph is None) or (len(K) > len(best_graph)):
             best_k = k
             best_graph = K
-    assert best_k is not None
+            break
     return best_graph, best_k
 
 

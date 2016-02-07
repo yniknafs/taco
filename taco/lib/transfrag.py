@@ -74,6 +74,35 @@ class Transfrag(object):
         else:
             return self.exons[-1][1]
 
+    def to_gtf(self):
+        strand_str = Strand.to_gtf(self.strand)
+        f = GTF.Feature()
+        f.seqid = self.chrom
+        f.source = 'taco'
+        f.feature = 'transcript'
+        f.start = self.start
+        f.end = self.end
+        f.score = 0.0
+        f.strand = strand_str
+        f.phase = '.'
+        f.attrs = {GTF.Attr.TRANSCRIPT_ID: self._id,
+                   GTF.Attr.SAMPLE_ID: self.sample_id,
+                   GTF.Attr.EXPR: str(self.expr),
+                   GTF.Attr.REF: str(int(self.is_ref))}
+        yield f
+        for e in self.exons:
+            f = GTF.Feature()
+            f.seqid = self.chrom
+            f.source = 'taco'
+            f.feature = 'exon'
+            f.start = e.start
+            f.end = e.end
+            f.score = 0.0
+            f.strand = strand_str
+            f.phase = '.'
+            f.attrs = {GTF.Attr.TRANSCRIPT_ID: self._id}
+            yield f
+
     @staticmethod
     def from_gtf(f):
         '''GTF.Feature object to Transfrag'''

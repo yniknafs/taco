@@ -19,6 +19,9 @@ __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
+PROFILE = True
+PROFILE_FILENAME = 'taco.prof'
+
 
 def main():
     # instantiate from command line
@@ -44,4 +47,8 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    if PROFILE:
+        import cProfile
+        sys.exit(cProfile.run('main()', filename=PROFILE_FILENAME))
+    else:
+        sys.exit(main())

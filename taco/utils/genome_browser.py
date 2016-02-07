@@ -92,8 +92,9 @@ def main():
         subprocess.call([bedGraphToBigWig, infile, r.chrom_sizes_file,
                          outfile])
 
-    prepare_igvtools(igvtools, r.node_gtf_file, ext='gtf')
+    prepare_igvtools(igvtools, r.splice_graph_gtf_file, ext='gtf')
     prepare_igvtools(igvtools, r.assembly_gtf_file, ext='gtf')
+    prepare_igvtools(igvtools, r.assembly_loss_gtf_file, ext='gtf')
     prepare_igvtools(igvtools, r.splice_bed_file, ext='bed')
 
 

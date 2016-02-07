@@ -231,8 +231,12 @@ class SpliceGraph(object):
                 bisect_func = bisect.bisect_left
             i = bisect_func(node_bounds, pos)
             n = (node_bounds[i-1], node_bounds[i])
-            assert n in G
-            G.node[n][direction] = True
+            if n in G:
+                # 2/5/2016: observed case where trimming caused an interval
+                # with zero expression, and this function then crashed when
+                # attempting to mark the node as a start/stop. We no longer
+                # attempt to mark nodes in zero expression regions.
+                G.node[n][direction] = True
 
     def _add_to_interval_trees(self, t):
         istart = Interval(t.start, t.start+1, value=t)
@@ -240,61 +244,101 @@ class SpliceGraph(object):
         self.tree_starts.insert_interval(istart)
         self.tree_ends.insert_interval(iend)
 
-    def _trim_change_point(self, cp_pos, cp_start, cp_end, cp_sign):
+    def _trim_change_point(self, cp):
         # search for matches in change point interval
         num_trimmed = 0
-        if cp_sign < 0:
-            hits = self.tree_ends.find(cp_pos, cp_end)
+        if cp.sign < 0:
+            hits = self.tree_ends.find(cp.pos, cp.end)
             for hit in hits:
                 t = hit.value
                 # last exon start cannot overlap interval
                 last_exon_start = t.exons[-1][0]
-                if cp_pos <= last_exon_start <= cp_end:
+                if cp.pos <= last_exon_start <= cp.end:
                     continue
                 # trim end left
-                t.exons[-1] = Exon(last_exon_start, cp_pos)
+                t.exons[-1] = Exon(last_exon_start, cp.pos)
                 num_trimmed += 1
         else:
-            hits = self.tree_starts.find(cp_start, cp_pos)
+            hits = self.tree_starts.find(cp.start, cp.pos)
             for hit in hits:
                 t = hit.value
                 # first exon end cannot overlap interval
                 first_exon_end = t.exons[0][1]
-                if cp_start <= first_exon_end <= cp_pos:
+                if cp.start <= first_exon_end <= cp.pos:
                     continue
                 # trim start right
-                t.exons[0] = Exon(cp_pos, first_exon_end)
+                t.exons[0] = Exon(cp.pos, first_exon_end)
                 num_trimmed += 1
-        logging.debug('\tfound %d hits and trimmed %d' % (len(hits), num_trimmed))
 
-    def detect_change_points(self, trim=True, *args, **kwargs):
+    def detect_change_points(self, *args, **kwargs):
         '''
-        trim: if true, will trim transfrags around change points
         *args, **kwargs: passed directly to 'run_changepoint'
+
+        returns list of ChangePoint tuples
         '''
+        changepts = []
         for node in self.G:
             expr_data = self.get_expr_data(node.start, node.end)
-            changepts = run_changepoint(expr_data, *args, **kwargs)
-            # add start and stop sites
-            for cp in changepts:
-                cp_left = cp.index - cp.dist_left
-                cp_right = cp.index + cp.dist_right
-                cp_pos = node.start + cp.index
-                cp_start = node.start + cp_left
-                cp_end = node.start + cp_right
-                logging.debug('\tchange point: %s:%d(%d-%d)[%s] node(%d-%d) '
-                              'sign=%f pval=%f fc=%f' %
-                              (self.chrom, cp_pos, cp_start, cp_end,
-                               Strand.to_gtf(self.strand),
-                               node.start, node.end,
-                               cp.sign, cp.pvalue, cp.foldchange))
-                if ((self.strand != Strand.NEG and cp.sign < 0) or
-                    (self.strand == Strand.NEG and cp.sign > 0)):
-                    self.stop_sites.add(cp_pos)
-                else:
-                    self.start_sites.add(cp_pos)
-                if trim:
-                    self._trim_change_point(cp_pos, cp_start, cp_end, cp.sign)
+            for cp in run_changepoint(expr_data, *args, **kwargs):
+                # add offset from start of node to change point positions
+                cp = cp._replace(pos=node.start + cp.pos,
+                                 start=node.start + cp.start,
+                                 end=node.start + cp.end)
+                changepts.append(cp)
+                logging.debug('\t%s:%d-%d[%s] node: %s-%s cp:%d(%d-%d) '
+                              'p=%.3f fc=%.3f' %
+                              (self.chrom, self.start, self.end,
+                               Strand.to_gtf(self.strand), node.start,
+                               node.end, cp.pos, cp.start, cp.end,
+                               cp.pvalue, cp.foldchange))
+        return changepts
+
+    def apply_change_point(self, cp, trim=True):
+        '''
+        trim: if true, will trim transfrags around change points
+        '''
+        if ((self.strand != Strand.NEG and cp.sign < 0) or
+                (self.strand == Strand.NEG and cp.sign > 0)):
+            self.stop_sites.add(cp.pos)
+        else:
+            self.start_sites.add(cp.pos)
+        if trim:
+            self._trim_change_point(cp)
+
+    def get_change_point_gtf(self, cp):
+        graph_id = ('G_%s_%d_%d_%s' %
+                    (self.chrom, self.start, self.end,
+                     Strand.to_gtf(self.strand)))
+        features = []
+        f = GTF.Feature()
+        f.seqid = self.chrom
+        f.source = 'taco'
+        f.feature = 'changept'
+        f.start = cp.pos
+        f.end = cp.pos + 1
+        f.score = 0
+        f.strand = Strand.to_gtf(self.strand)
+        f.phase = '.'
+        f.attrs = {'graph_id': graph_id,
+                   'sign': str(cp.sign),
+                   'pvalue': str(cp.pvalue),
+                   'foldchange': str(cp.foldchange)}
+        features.append(f)
+        f = GTF.Feature()
+        f.seqid = self.chrom
+        f.source = 'taco'
+        f.feature = 'changeinterval'
+        f.start = cp.start
+        f.end = cp.end
+        f.score = 0
+        f.strand = Strand.to_gtf(self.strand)
+        f.phase = '.'
+        f.attrs = {'graph_id': graph_id,
+                   'sign': str(cp.sign),
+                   'pvalue': str(cp.pvalue),
+                   'foldchange': str(cp.foldchange)}
+        features.append(f)
+        return features
 
     def split(self):
         '''splits into weakly connected component subgraphs'''
@@ -339,9 +383,11 @@ class SpliceGraph(object):
                 stop_nodes.add(n)
         return start_nodes, stop_nodes
 
-    def get_expr_data(self, start, end):
-        assert start >= self.start
-        assert end <= self.end
+    def get_expr_data(self, start=None, end=None):
+        if start is None:
+            start = self.start
+        if end is None:
+            end = self.end
         if ((start < self.start) or (end > self.end)):
             m = ('query %d-%d outside locus bounds %d-%d' %
                  (start, end, self.start, self.end))
@@ -351,7 +397,7 @@ class SpliceGraph(object):
         return self.expr_data[astart:aend]
 
     def get_node_gtf(self):
-        locus_id = ('L_%s_%d_%d_%s' %
+        graph_id = ('G_%s_%d_%d_%s' %
                     (self.chrom, self.start, self.end,
                      Strand.to_gtf(self.strand)))
         # iterate through locus and return change point data
@@ -369,7 +415,7 @@ class SpliceGraph(object):
             f.score = 0
             f.strand = Strand.to_gtf(self.strand)
             f.phase = '.'
-            f.attrs = {'locus_id': locus_id,
+            f.attrs = {'graph_id': graph_id,
                        'expr_min': str(expr_data.min()),
                        'expr_max': str(expr_data.max()),
                        'expr_mean': str(expr_data.mean()),

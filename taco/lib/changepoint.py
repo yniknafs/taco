@@ -18,14 +18,14 @@ __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
-
-ChangePoint = namedtuple('ChangePoint', ['index', 'pvalue',
-                         'dist_left', 'dist_right', 'sign', 'foldchange'])
+ChangePoint = namedtuple('ChangePoint', ['index', 'dist_left', 'dist_right',
+                                         'pos', 'start', 'end',
+                                         'pvalue', 'foldchange', 'sign'])
 
 
 def run_changepoint(a, pval=0.05, fc_cutoff=0.80, size_cutoff=20,
                     cp_func=mse_cython, smooth_window="hanning",
-                    smooth_window_len=75):
+                    smooth_window_len=11):
     '''
     Detects change points in 1D array 'a' by minimizing mean-squared error
     (MSE). Selected change points must have mannwhitneyu pvalue < 'pval' and
@@ -130,8 +130,9 @@ def bin_seg_slope(a, s_a, pval=0.05, fc_cutoff=0.80, size_cutoff=20,
     # TODO: when does this happen?
     if j != 0 and k != 0:
         # save changepoint
-        cps.append(ChangePoint(index=i + offset, pvalue=p, dist_left=j,
-                               dist_right=k, sign=sign, foldchange=fc))
+        cps.append(ChangePoint(index=i+offset, dist_left=j, dist_right=k,
+                               pos=i+offset, start=i-j, end=i+k,
+                               pvalue=p, sign=sign, foldchange=fc))
         # test left segment
         if (offset+i-j) > offset:
             b1 = a[:i-j]

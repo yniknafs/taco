@@ -36,23 +36,24 @@ def test_reachability():
 def test_unreachable_kmers():
     t_dict, locus = read_single_locus('path_graph_k2.gtf')
     sgraph = SpliceGraph.create(t_dict.values())
-    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k=2)
-    assert not valid
+    K = create_path_graph(sgraph, k=2)
+    assert not K.graph['valid']
     assert len(K) == 0
-    assert len(unreachable) == 8
+    assert len(K.graph['unreachable_kmers']) == 8
 
-    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k=1)
-    assert len(lost_paths) == 0
-    assert len(unreachable) == 0
-    assert valid
+    K = create_path_graph(sgraph, k=1)
+    assert len(K.graph['lost_transfrags']) == 0
+    assert len(K.graph['unreachable_kmers']) == 0
+    assert K.graph['valid']
     assert len(K) == 8
 
     K, k = create_optimal_path_graph(sgraph, frag_length=0, kmax=0,
                                      loss_threshold=1.0)
     assert k == 1
     assert len(K) == 8
+
     # print 'K', K.nodes()
-    # print 'lost', lost_paths
+    # print 'lost', K.graph['lost_transfrags']
     # print 'unreachable', unreachable
     # print 'valid', valid
     #
@@ -183,7 +184,7 @@ def test_path_graph1():
     paths = [ABCDE, ACE, ABCE, ACDE]
     # create path graph k = 2
     k = 2
-    G1, lost_paths, unreachable, valid = create_path_graph(SG, k)
+    G1 = create_path_graph(SG, k)
     G2 = nx.DiGraph()
     for path in paths:
         kmers = list(get_kmers(path, k))
@@ -198,9 +199,9 @@ def test_path_graph2():
     # trivial case without additional stops or starts
     k = choose_k_by_frag_length(sgraph, frag_length=400, kmin=2)
     assert k == 1
-    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k)
+    K = create_path_graph(sgraph, k)
     kmer_id_map = dict((v, k) for k, v in K.graph['id_kmer_map'].iteritems())
-    assert len(lost_paths) == 0
+    assert len(K.graph['lost_transfrags']) == 0
     n = kmer_id_map[(Exon(0, 100),)]
     assert K.node[n]['expr'] == 12.0
     assert K.node[SOURCE]['expr'] == 12.0
@@ -209,8 +210,8 @@ def test_path_graph2():
     # add a stop site
     sgraph.stop_sites.add(50)
     sgraph.recreate()
-    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k=2)
-    assert len(lost_paths) == 0
+    K = create_path_graph(sgraph, k=2)
+    assert len(K.graph['lost_transfrags']) == 0
     kmer_id_map = dict((v, k) for k, v in K.graph['id_kmer_map'].iteritems())
     n1 = kmer_id_map[(Exon(start=0, end=50), Exon(start=50, end=100))]
     n2 = kmer_id_map[(Exon(start=0, end=50),)]
@@ -229,7 +230,7 @@ def test_path_graph2():
     sgraph.start_sites.add(50)
     sgraph.stop_sites.add(50)
     sgraph.recreate()
-    K, lost_paths, unreachable, valid = create_path_graph(sgraph, k=2)
+    K = create_path_graph(sgraph, k=2)
     smooth_graph(K)
     kmer_id_map = dict((v, k) for k, v in K.graph['id_kmer_map'].iteritems())
     n1 = kmer_id_map[(Exon(start=0, end=50), Exon(start=50, end=100))]

@@ -125,8 +125,7 @@ def subtract_path(G, path, score):
                                  d[TMP_KMER_EXPR] - score)
 
 
-def find_suboptimal_paths(G, source, sink, fraction_major_path=1e-3,
-                          max_paths=1000):
+def find_suboptimal_paths(G, source, sink, path_frac=1e-5, max_paths=1000):
     """
     finds suboptimal paths through graph G using a greedy algorithm that
     finds the highest score path using dynamic programming, subtracts
@@ -145,13 +144,12 @@ def find_suboptimal_paths(G, source, sink, fraction_major_path=1e-3,
     max_score = G.node[source][KMER_EXPR]
     if max_score < MIN_SCORE:
         return []
-    lowest_score = G.node[source][KMER_EXPR] * fraction_major_path
+    lowest_score = G.node[source][KMER_EXPR] * path_frac
     lowest_score = max(MIN_SCORE, lowest_score)
     # find highest scoring path
     path, score = find_path(G, source, sink)
     path_results[path] = score
     subtract_path(G, path, score)
-    highest_score = score
     # iterate to find suboptimal paths
     iterations = 1
     while iterations < max_paths:
@@ -162,8 +160,6 @@ def find_suboptimal_paths(G, source, sink, fraction_major_path=1e-3,
         # store path
         if path not in path_results:
             path_results[path] = score
-        # TODO: remove assert
-        assert highest_score >= score
         # subtract path score from graph and resort seed nodes
         subtract_path(G, path, score)
         iterations += 1

@@ -11,7 +11,7 @@ from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.splice_graph import SpliceGraph, Node
 from taco.lib.cChangePoint import mse as mse_cython
 from taco.lib.changepoint import mse as mse_python, smooth, run_changepoint
-from taco.lib.assemble import assemble_isoforms
+from taco.lib.assemble import assemble_isoforms, Config
 from taco.lib.transfrag import Transfrag
 
 from taco.test.base import read_single_locus
@@ -70,16 +70,14 @@ def test_trim_transfrags():
     cps = run_changepoint(sgraph.expr_data, smooth_window_len=11)
     assert len(cps) == 1
     cp = cps[0]
-    assert cp.index == 110
+    assert cp.pos == 110
     assert cp.foldchange < 0.5
     assert cp.sign == -1
-    cp_left = cp.index - cp.dist_left
-    cp_right = cp.index + cp.dist_right
-    cp_pos = start + cp.index
-    cp_start = start + cp_left
-    cp_end = start + cp_right
+    cp = cp._replace(pos=start + cp.pos,
+                     start=start + cp.start,
+                     end=start + cp.end)
     # trim transfrags
-    sgraph._trim_change_point(cp_pos, cp_start, cp_end, cp.sign)
+    sgraph._trim_change_point(cp)
     expr_data_after = sgraph._compute_expression()
     assert expr_data_after[0] == 250
     assert expr_data_after[-1] == 50
@@ -90,21 +88,25 @@ def test_trim_transfrags():
     tup = make_ramp(Strand.POS, sign=-1)
     chrom, start, end, strand, change_expr, base_expr, transfrags = tup
     sgraph = SpliceGraph.create(transfrags)
-    sgraph.detect_change_points(smooth_window_len=11)
+    cps = sgraph.detect_change_points(smooth_window_len=11)
+    for cp in cps:
+        sgraph.apply_change_point(cp)
     sgraph.recreate()
     assert sgraph.expr_data[cp.index - 1] == 150
     assert sgraph.expr_data[cp.index] == base_expr
-    assert cp_pos in sgraph.stop_sites
+    assert cp.pos in sgraph.stop_sites
 
     # negative strand should not affect change point
     tup = make_ramp(Strand.NEG, sign=-1)
     chrom, start, end, strand, left_expr, base_expr, transfrags = tup
     sgraph = SpliceGraph.create(transfrags)
-    sgraph.detect_change_points(smooth_window_len=11)
+    cps = sgraph.detect_change_points(smooth_window_len=11)
+    for cp in cps:
+        sgraph.apply_change_point(cp)
     sgraph.recreate()
     assert sgraph.expr_data[cp.index - 1] == 150
     assert sgraph.expr_data[cp.index] == base_expr
-    assert cp_pos in sgraph.start_sites
+    assert cp.pos in sgraph.start_sites
 
     # neg strand change in opposite direction
     tup = make_ramp(Strand.NEG, sign=1)
@@ -115,13 +117,16 @@ def test_trim_transfrags():
     assert cp.index == 110
     assert cp.foldchange < 0.5
     assert cp.sign == 1.0
-    sgraph.detect_change_points(smooth_window_len=11)
+    cps = sgraph.detect_change_points(smooth_window_len=11)
+    cp = cps[0]
+    for cp in cps:
+        sgraph.apply_change_point(cp)
     sgraph.recreate()
     assert sgraph.expr_data[0] == 50
     assert sgraph.expr_data[-1] == 250
     assert sgraph.expr_data[cp.index - 1] == base_expr
     assert sgraph.expr_data[cp.index] == 160
-    assert cp_pos in sgraph.stop_sites
+    assert cp.pos in sgraph.stop_sites
 
     # pos strand change in opposite direction
     tup = make_ramp(Strand.POS, sign=1)
@@ -132,13 +137,32 @@ def test_trim_transfrags():
     assert cp.index == 110
     assert cp.foldchange < 0.5
     assert cp.sign == 1.0
-    sgraph.detect_change_points(smooth_window_len=11)
+    cps = sgraph.detect_change_points(smooth_window_len=11)
+    for cp in cps:
+        sgraph.apply_change_point(cp)
     sgraph.recreate()
+
     assert sgraph.expr_data[0] == 50
     assert sgraph.expr_data[-1] == 250
     assert sgraph.expr_data[cp.index - 1] == base_expr
     assert sgraph.expr_data[cp.index] == 160
-    assert cp_pos in sgraph.start_sites
+    assert cp.pos in sgraph.start_sites
+    return
+
+
+def test_trimming_to_zero_bug():
+    t_dict, locus = read_single_locus('change_point_bug.gtf')
+    transfrags_un = locus.get_transfrags(Strand.NA)
+    sgraph = SpliceGraph.create(transfrags_un)
+    cps = sgraph.detect_change_points()
+    for cp in cps:
+        sgraph.apply_change_point(cp)
+    sgraph.recreate()
+    # get start/stop nodes
+    start_nodes, stop_nodes = sgraph.get_start_stop_nodes()
+    assert Exon(173433532, 173435169) in stop_nodes
+    assert Exon(173433532, 173435169) in start_nodes
+    assert Exon(173433532, 173435169) in start_nodes
     return
 
 
@@ -160,7 +184,9 @@ def test_ccle55_cuff_noc2l():
     fc_cutoff = 0.8
     n1 = Exon(934942, 944589)
     assert sgraph.G.node[n1][Node.IS_STOP]
-    sgraph.detect_change_points(trim=trim, pval=pval, fc_cutoff=fc_cutoff)
+    cps = sgraph.detect_change_points(pval=pval, fc_cutoff=fc_cutoff)
+    for cp in cps:
+        sgraph.apply_change_point(cp, trim=trim)
     true_starts = set([964528, 957434, 959316])
     true_stops = set([944278])
     assert true_starts.symmetric_difference(sgraph.start_sites) == set([])
@@ -177,7 +203,9 @@ def test_ccle55_cuff_noc2l():
     assert Exon(944278, 944589) in stop_nodes
 
     # ensure best path uses change points
-    isoforms = assemble_isoforms(sgraph, 400, 0, 1)
+    config = Config.defaults()
+    config.max_paths = 1
+    isoforms = assemble_isoforms(sgraph, config)
     assert len(isoforms) == 1
     isoform = isoforms[0]
     assert isoform.path[0] == Exon(944278, 944800)
@@ -201,7 +229,7 @@ def get_data(rundir, chrom, start, end, strand):
 def plot_slope(a, refs=None):
     if refs is None:
         refs = []
-    smooth_a = np.array(smooth(a, window_len=75, window="hanning"), dtype=FLOAT_DTYPE)
+    smooth_a = np.array(smooth(a, window_len=11, window="hanning"), dtype=FLOAT_DTYPE)
     slope_a = np.gradient(smooth_a)
 
     plt.figure(1)
@@ -210,8 +238,12 @@ def plot_slope(a, refs=None):
     plt.subplot(312)
     plt.plot(smooth_a, 'g')
 
-    cps = run_changepoint(a)
-    print cps
+    cps = run_changepoint(a, smooth_window_len=11)
+# def run_changepoint(a, pval=0.05, fc_cutoff=0.80, size_cutoff=20,
+#                     cp_func=mse_cython, smooth_window="hanning",
+#                     smooth_window_len=75):
+
+    print 'BUBBA SCHLUMPER', cps
     for cp in cps:
         sign = np.sign(slope_a[cp.index])
         color = 'k'
@@ -232,7 +264,7 @@ def test_anecdotes():
 
     def tester(tup, ref):
         chrom, start, end, strand = tup
-        rundir = '/Users/mkiyer/Documents/lab/projects/taco/ccle/tacoruns/ccle55_st_frac10'
+        rundir = '/Users/mkiyer/Documents/lab/projects/taco/ccle/cl1'
         a = get_data(rundir, chrom, start, end, strand)
         print chrom, start, end
         ref_i = []
@@ -257,8 +289,13 @@ def test_anecdotes():
         ('chr18', 32089621, 32092235, '+'),
     ]
 
-    # for test in tests:
-    #     tester(test, [])
+    tester(('chr14', 24188807, 24188862, '-'), [])
+    tester(('chr14', 24213498, 24213689, '-'), [])
+
+
+
+    #for test in tests:
+    #    tester(test, [])
     #
     #
     # tester(('chr1', 11936, 14829, '-'), [14403])
