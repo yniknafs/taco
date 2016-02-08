@@ -2,15 +2,15 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import logging
-import collections
+from operator import itemgetter
 from multiprocessing import Process, JoinableQueue, Value, Lock
 
 from gtf import GTF
 from base import Strand
 from transfrag import Transfrag
 from locus import Locus
-from path_graph import smooth_graph, reconstruct_path, KMER_EXPR, \
-    create_optimal_path_graph
+from path_graph import KMER_EXPR, create_optimal_path_graph, smooth_graph, \
+    reconstruct_path
 from path_finder import find_suboptimal_paths
 from bx.cluster import ClusterTree
 
@@ -23,31 +23,6 @@ __version__ = "0.4.0"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
-
-
-class Isoform(object):
-    __slots__ = ('expr', 'path', 'gene_frac', 'path_frac',
-                 'gene_id', 'tss_id')
-
-    def __init__(self, path, expr, frac):
-        self.path = path
-        self.path_frac = frac
-        self.expr = expr
-        self.gene_frac = None
-        self.gene_id = -1
-        self.tss_id = -1
-
-
-class LockValue(object):
-    def __init__(self, initval=0):
-        self.val = Value('L', initval)
-        self.lock = Lock()
-
-    def next(self):
-        with self.lock:
-            cur_val = self.val.value
-            self.val.value += 1
-            return cur_val
 
 
 class Config(object):
@@ -82,11 +57,96 @@ class Config(object):
         self.path_graph_kmax = 0
         self.path_graph_loss_threshold = 0.10
         self.path_graph_frag_length = 400
-        self.path_frac = 1e-6
-        self.max_paths = 1000000
-        self.isoform_frac = 0.05
-        self.max_isoforms = 100
+        self.path_frac = 0
+        self.max_paths = 0
+        self.isoform_frac = 0
+        self.max_isoforms = 0
         return self
+
+
+class Isoform(object):
+    __slots__ = ('expr', 'path', 'gene_frac', 'path_frac',
+                 'gene_id', 'tss_id')
+
+    def __init__(self, path=None, expr=0.0, path_frac=1.0, gene_frac=1.0):
+        self.path = path
+        self.expr = expr
+        self.path_frac = path_frac
+        self.gene_frac = gene_frac
+        self.gene_id = -1
+        self.tss_id = -1
+
+
+class Cluster(object):
+
+    def __init__(self):
+        self._id = 0
+        self.expr = 1e-10
+        self.nodes = set()
+        self.paths = []
+
+    def __len__(self):
+        return len(self.paths)
+
+    def _add(self, path, expr):
+        self.expr += expr
+        self.nodes.update(path)
+        self.paths.append((path, expr))
+
+    def iterpaths(self):
+        for path, expr in self.paths:
+            yield path, expr, (expr / self.expr)
+
+    def merge(self, *others):
+        for other in others:
+            self.expr += other.expr
+            self.nodes.update(other.nodes)
+            self.paths.extend(other.paths)
+        self.paths.sort(key=itemgetter(1), reverse=True)
+
+    @staticmethod
+    def build(paths, min_frac=0.0):
+        filtered = []
+        clusters = {}
+        _id = 0
+        for i in xrange(len(paths)):
+            path, expr = paths[i]
+            # does path overlap existing clusters?
+            matches = [c for c in clusters.itervalues()
+                       if not c.nodes.isdisjoint(path)]
+            if len(matches) == 0:
+                # make new cluster
+                c = Cluster()
+                c._id = _id
+                _id += 1
+                clusters[c._id] = c
+            else:
+                # check frac in all clusters
+                fracs = [(expr / (c.expr + expr))
+                         for c in clusters.itervalues()]
+                if any((x < min_frac) for x in fracs):
+                    filtered.append((path, expr))
+                    continue
+                c = matches[0]
+                # merge clusters
+                c.merge(*matches[1:])
+                for c2 in matches[1:]:
+                    del clusters[c2._id]
+            # add to cluster
+            c._add(path, expr)
+        return clusters.values(), filtered
+
+
+class LockValue(object):
+    def __init__(self, initval=0):
+        self.val = Value('L', initval)
+        self.lock = Lock()
+
+    def next(self):
+        with self.lock:
+            cur_val = self.val.value
+            self.val.value += 1
+            return cur_val
 
 
 def get_gtf_features(chrom, strand, exons, locus_id, gene_id, tss_id,
@@ -153,34 +213,7 @@ def write_bed(chrom, name, strand, score, exons):
     return fields
 
 
-def annotate_gene_and_tss_ids(isoforms, strand,
-                              gene_id_value_obj,
-                              tss_id_value_obj):
-    # cluster paths to determine gene ids
-    cluster_tree = ClusterTree(0, 1)
-    # map tss positions to unique ids
-    tss_pos_id_map = {}
-    for i, isoform in enumerate(isoforms):
-        start = isoform.path[0].start
-        end = isoform.path[-1].end
-        # cluster transcript coordinates
-        cluster_tree.insert(start, end, i)
-        # map TSS positions to IDs
-        tss_pos = end if strand == Strand.NEG else start
-        if tss_pos not in tss_pos_id_map:
-            tss_id = tss_id_value_obj.next()
-            tss_pos_id_map[tss_pos] = tss_id
-        else:
-            tss_id = tss_pos_id_map[tss_pos]
-        isoform.tss_id = tss_id
-    # retrieve transcript clusters and assign gene ids
-    for start, end, indexes in cluster_tree.getregions():
-        gene_id = gene_id_value_obj.next()
-        for i in indexes:
-            isoforms[i].gene_id = gene_id
-
-
-def assign_tss_ids(isoforms, strand, gene_id_value_obj, tss_id_value_obj):
+def assign_ids(isoforms, strand, gene_id_value_obj, tss_id_value_obj):
     # map tss positions to unique ids
     tss_pos_id_map = {}
     gene_id = gene_id_value_obj.next()
@@ -196,61 +229,6 @@ def assign_tss_ids(isoforms, strand, gene_id_value_obj, tss_id_value_obj):
             tss_id = tss_pos_id_map[tss_pos]
         isoform.gene_id = gene_id
         isoform.tss_id = tss_id
-
-
-def _group_overlapping_isoforms(isoforms):
-    # cluster paths
-    cluster_tree = ClusterTree(0, 1)
-    for i, isoform in enumerate(isoforms):
-        start = isoform.path[0].start
-        end = isoform.path[-1].end
-        # cluster transcript coordinates
-        cluster_tree.insert(start, end, i)
-    # retrieve transcript clusters and bin transcripts by gene id
-    for start, end, indexes in cluster_tree.getregions():
-        gene_isoforms = [isoforms[i] for i in indexes]
-        yield gene_isoforms
-
-
-def _filter_isoforms(isoforms, frac_limit=0.05, max_isoforms=1):
-    if len(isoforms) == 0:
-        return
-    if max_isoforms <= 0:
-        max_isoforms = len(isoforms)
-    # compute total expression and find best
-    tot_expr = sum(isoform.expr for isoform in isoforms)
-    tot_expr = max(1e-8, tot_expr)
-    max_expr = None
-    for i in xrange(min(len(isoforms), max_isoforms)):
-        isoform = isoforms[i]
-        # compute isoform fraction
-        isoform.gene_frac = isoform.expr / tot_expr
-        # guarantee at least one isoform
-        if max_expr is None:
-            max_expr = isoform.expr
-        else:
-            assert isoform.expr <= max_expr
-            if isoform.gene_frac < frac_limit:
-                break
-        yield isoform
-
-
-def filter_gene_isoforms(isoforms, frac_limit=0.05, max_isoforms=1):
-    if len(isoforms) == 0:
-        return
-    assert max_isoforms > 0
-    # split into overlapping groups
-    isoform_lists = list(_group_overlapping_isoforms(isoforms))
-    for unfilt_isoforms in isoform_lists:
-        # apply post-assembly filters
-        filt_isoforms = list(_filter_isoforms(unfilt_isoforms, frac_limit,
-                                              max_isoforms))
-        # split into overlapping groups again
-        gene_isoform_lists = list(_group_overlapping_isoforms(filt_isoforms))
-        # recompute gene_frac (filter a second time?)
-        for gene_isoforms in gene_isoform_lists:
-            gene_isoforms = list(_filter_isoforms(gene_isoforms, 0, 0))
-            yield gene_isoforms
 
 
 def assemble_isoforms(sgraph, config):
@@ -299,17 +277,31 @@ def assemble_isoforms(sgraph, config):
                    Strand.to_gtf(sgraph.strand), k, len(K),
                    source_expr))
     id_kmer_map = K.graph['id_kmer_map']
-    isoforms = []
+    paths = []
     for kmer_path, expr in find_suboptimal_paths(K, K.graph['source'],
                                                  K.graph['sink'],
                                                  path_frac=config.path_frac,
                                                  max_paths=config.max_paths):
-        # reconstruct path
+        # reconstruct path (remove source/sink)
         path = reconstruct_path(kmer_path, id_kmer_map, sgraph.strand)
         logging.debug("\texpr=%f length=%d" % (expr, len(path)))
-        # add to path list
-        isoforms.append(Isoform(path, expr, expr / source_expr))
-    return isoforms
+        paths.append((path, expr))
+    # build gene clusters
+    clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac)
+    logging.debug('\tclusters: %d filtered: %d' %
+                  (len(clusters), len(filtered)))
+    gene_isoforms = []
+    for cluster in clusters:
+        isoforms = []
+        for path, expr, frac in cluster.iterpaths():
+            isoforms.append(Isoform(path=path, expr=expr,
+                                    path_frac=(expr / source_expr),
+                                    gene_frac=(expr / cluster.expr)))
+        # apply max isoforms limit (per cluster)
+        if config.max_isoforms > 0:
+            isoforms = isoforms[:config.max_isoforms]
+        gene_isoforms.append(isoforms)
+    return gene_isoforms
 
 
 def assemble_gene(sgraph, locus_id_str, config):
@@ -325,8 +317,9 @@ def assemble_gene(sgraph, locus_id_str, config):
         changepts = sgraph.detect_change_points(
             pval=config.change_point_pvalue,
             fc_cutoff=config.change_point_fold_change)
-        logging.debug('%s changepoint: found %d changes' %
-                      (locus_id_str, len(changepts)))
+        logging.debug('%s:%d-%d[%s] change points: %d' %
+                      (sgraph.chrom, sgraph.start, sgraph.end,
+                       Strand.to_gtf(sgraph.strand), len(changepts)))
         for cp in changepts:
             sgraph.apply_change_point(cp, config.change_point_trim)
             # output splice graph change points
@@ -336,16 +329,11 @@ def assemble_gene(sgraph, locus_id_str, config):
         if len(changepts) > 0:
             sgraph.recreate()
 
-    # run isoform path finding algorithm
-    isoforms = assemble_isoforms(sgraph, config)
-
-    # post-assembly filter and group into genes
-    for gene_isoforms in filter_gene_isoforms(
-            isoforms, config.isoform_frac, config.max_isoforms):
+    # run isoform path finding algorithm, filter and group into genes
+    for gene_isoforms in assemble_isoforms(sgraph, config):
         # assign gene_id and tss_id
-        assign_tss_ids(gene_isoforms, sgraph.strand,
-                       config.gene_id_value_obj,
-                       config.tss_id_value_obj)
+        assign_ids(gene_isoforms, sgraph.strand, config.gene_id_value_obj,
+                   config.tss_id_value_obj)
         # write output
         for isoform in gene_isoforms:
             # assign transcript id

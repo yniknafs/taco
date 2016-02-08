@@ -7,6 +7,7 @@ import networkx as nx
 
 from base import Exon, Strand
 from splice_graph import split_transfrag
+from optimize import maximize_bisect
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -337,12 +338,16 @@ def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
     '''
     # find upper bound to k
     kmax = choose_kmax(sgraph, frag_length, kmax)
+    # START: Hard-coded way to skip optimization
+    # k = min(kmax, 22)
+    # K = create_path_graph(sgraph, k)
+    # return K, k
+    # END: Harded-coded way to skip optimization
     sgraph_id_str = '%s:%d-%d[%s]' % (sgraph.chrom, sgraph.start, sgraph.end,
                                       Strand.to_gtf(sgraph.strand))
     tot_expr = sum(sgraph.get_expr_data(*n).mean() for n in sgraph.G)
-    best_k = 0
-    best_graph = None
-    for k in xrange(kmax, 0, -1):
+
+    def f(k):
         K = create_path_graph(sgraph, k)
         valid = K.graph['valid']
         L = K.graph['loss_graph']
@@ -366,14 +371,14 @@ def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
                       int(valid))
             print >>stats_fh, '\t'.join(map(str, fields))
         if not valid:
-            continue
+            return -k
         if lost_expr_frac > loss_threshold:
-            continue
-        if (best_graph is None) or (len(K) > len(best_graph)):
-            best_k = k
-            best_graph = K
-            break
-    return best_graph, best_k
+            return -k
+        return len(K)
+
+    k, num_kmers = maximize_bisect(f, 1, kmax, 0)
+    K = create_path_graph(sgraph, k)
+    return K, k
 
 
 def reconstruct_path(kmer_path, id_kmer_map, strand):

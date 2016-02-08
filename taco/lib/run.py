@@ -34,8 +34,8 @@ class Args:
     GUIDED_ENDS = False
     GTF_EXPR_ATTR = 'TPM'
     MIN_FRAG_LENGTH = 200
-    ISOFORM_FRAC = 0.01
-    MAX_ISOFORMS = 100
+    ISOFORM_FRAC = 0.0
+    MAX_ISOFORMS = 0
     CHANGE_POINT = True
     CHANGE_POINT_PVALUE = 0.05
     CHANGE_POINT_FOLD_CHANGE = 0.80
@@ -43,8 +43,8 @@ class Args:
     PATH_GRAPH_KMAX = 0
     PATH_GRAPH_LOSS_THRESHOLD = 0.10
     PATH_GRAPH_FRAG_LENGTH = 400
-    PATH_FRAC = 1e-5
-    MAX_PATHS = 1000000
+    PATH_FRAC = 0.0
+    MAX_PATHS = 0
     RESUME = False
     OUTPUT_DIR = 'taco'
     PROG = 'taco'
@@ -263,8 +263,8 @@ class Args:
                 parser.error("min_frag_length < 0")
             if (args.isoform_frac < 0) or (args.isoform_frac > 1):
                 parser.error("isoform_frac out of range (0.0-1.0)")
-            if (args.max_isoforms < 1):
-                parser.error("max_isoforms <= 0")
+            if (args.max_isoforms < 0):
+                parser.error("max_isoforms < 0")
 
             if args.path_graph_frag_length < 0:
                 parser.error("path_graph_frag_length < 0")
@@ -272,8 +272,8 @@ class Args:
                 parser.error("loss_threshold not in range (0.0-1.0)")
             if args.path_graph_kmax < 0:
                 parser.error("kmax must be >= 0")
-            if args.max_paths < 1:
-                parser.error("max_paths must be >= 1")
+            if args.max_paths < 0:
+                parser.error("max_paths must be >= 0")
             if not (0 <= args.path_frac <= 1):
                 parser.error("path_frac not in range (0.0-1.0)")
 

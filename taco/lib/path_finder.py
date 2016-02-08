@@ -125,7 +125,7 @@ def subtract_path(G, path, score):
                                  d[TMP_KMER_EXPR] - score)
 
 
-def find_suboptimal_paths(G, source, sink, path_frac=1e-5, max_paths=1000):
+def find_suboptimal_paths(G, source, sink, path_frac=1e-5, max_paths=0):
     """
     finds suboptimal paths through graph G using a greedy algorithm that
     finds the highest score path using dynamic programming, subtracts
@@ -152,7 +152,9 @@ def find_suboptimal_paths(G, source, sink, path_frac=1e-5, max_paths=1000):
     subtract_path(G, path, score)
     # iterate to find suboptimal paths
     iterations = 1
-    while iterations < max_paths:
+    while True:
+        if max_paths > 0 and iterations >= max_paths:
+            break
         # find path
         path, score = find_path(G, source, sink)
         if score <= lowest_score:
