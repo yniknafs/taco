@@ -30,12 +30,17 @@ def test_maximize_bisect():
         a = [1, 5, 11, 14, 16, 50, 100, 10000, 5, 4, 3, 2, 1]
         return a[x]
     x, y = maximize_bisect(f3, 1, 12, 0)
-    print x, y
     assert x == 7
     assert y == 10000
 
     def f4(x):
-        return 1
+        return x
     x, y = maximize_bisect(f4, 1, 1, 0)
     assert x == 1
     assert y == 1
+    x, y = maximize_bisect(f4, 1, 2, 0)
+    assert x == 2
+    assert y == 2
+    x, y = maximize_bisect(f4, 1, 3, 0)
+    assert x == 3
+    assert y == 3

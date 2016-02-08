@@ -14,21 +14,21 @@ __status__ = "Development"
 
 def maximize_bisect(f, xmin, xmax, max_iterations=0):
     if max_iterations == 0:
-        max_iterations = (xmax - xmin)
-    if (xmax - xmin) <= 0:
-        return xmin, f(xmin)
+        max_iterations = xmax
+
     x = (xmin + xmax) / 2
     y = {}
-    iterations = 1
+    iterations = 0
     while iterations < max_iterations:
         if (xmax - xmin) <= 3:
             best_y = None
             best_x = None
-            for x in xrange(xmin, xmax + 1):
-                y1 = y[x] if x in y else f(x)
+            for x1 in xrange(xmin, xmax + 1):
+                y1 = y[x1] if x1 in y else f(x1)
+                y[x1] = y1
                 if (best_y is None) or (y1 > best_y):
                     best_y = y1
-                    best_x = x
+                    best_x = x1
             return best_x, best_y
 
         xlist = ((x + xmin) / 2, x, (x + xmax) / 2)
@@ -38,8 +38,8 @@ def maximize_bisect(f, xmin, xmax, max_iterations=0):
             x1 = xlist[i]
             y1 = y[x1] if x1 in y else f(x1)
             y[x1] = y1
-            if (best_y is None) or (y[x1] > best_y):
-                best_y = y[x1]
+            if (best_y is None) or (y1 > best_y):
+                best_y = y1
                 best_i = i
         if best_i == 0:
             xmax = x
