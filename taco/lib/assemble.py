@@ -9,8 +9,8 @@ from gtf import GTF
 from base import Strand
 from transfrag import Transfrag
 from locus import Locus
-from path_graph import KMER_EXPR, create_optimal_path_graph, smooth_graph, \
-    reconstruct_path
+from path_graph import KMER_EXPR, smooth_graph, reconstruct_path, \
+    create_optimal_path_graph, get_lost_nodes
 from path_finder import find_suboptimal_paths
 from bx.cluster import ClusterTree
 
@@ -244,11 +244,10 @@ def assemble_isoforms(sgraph, config):
 
     # report lost nodes
     if config.assembly_loss_gtf_fh is not None:
-        L = K.graph['loss_graph']
         graph_id = ('L_%s:%d-%d[%s]' %
                     (sgraph.chrom, sgraph.start, sgraph.end,
                      Strand.to_gtf(sgraph.strand)))
-        for n, d in L.nodes_iter(data=True):
+        for n in get_lost_nodes(sgraph, K):
             expr_data = sgraph.get_expr_data(*n)
             # return gtf feature for each node
             f = GTF.Feature()
@@ -261,9 +260,7 @@ def assemble_isoforms(sgraph, config):
             f.strand = Strand.to_gtf(sgraph.strand)
             f.phase = '.'
             f.attrs = {'graph_id': graph_id,
-                       'expr': str(expr_data.mean()),
-                       'transfrag': int(d['transfrag']),
-                       'kmer': int(d['kmer'])}
+                       'expr': str(expr_data.mean())}
             print >>config.assembly_loss_gtf_fh, str(f)
 
     # smooth kmer graph
@@ -446,8 +443,8 @@ def assemble(**kwargs):
     # path graph stats file
     config.path_graph_stats_fh = open(config.path_graph_stats_file, 'w')
     fields = ['locus', 'k', 'kmax', 'transfrags', 'nodes', 'kmers',
-              'lost_transfrags', 'lost_nodes', 'lost_kmers', 'tot_expr',
-              'lost_expr', 'lost_expr_frac', 'lost_node_frac', 'valid']
+              'short_transfrags', 'lost_kmers', 'tot_expr', 'lost_expr',
+              'lost_expr_frac', 'valid']
     print >>config.path_graph_stats_fh, '\t'.join(fields)
 
     # assembly gtf and bed files
