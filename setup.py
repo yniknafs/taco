@@ -19,18 +19,21 @@ __status__ = "Development"
 
 
 extensions = [
-    Extension('taco.lib.cBedGraph',
-              sources=['taco/lib/cBedGraph.pyx'],
+    Extension('taco.lib.cbedgraph',
+              sources=['taco/lib/cbedgraph.pyx'],
               include_dirs=[numpy_inc]),
-    Extension('taco.lib.cChangePoint',
-              sources=['taco/lib/cChangePoint.pyx'],
+    Extension('taco.lib.cchangepoint',
+              sources=['taco/lib/cchangepoint.pyx'],
               include_dirs=[numpy_inc]),
     Extension('taco.lib.bx.cluster',
               sources=['taco/lib/bx/cluster.pyx',
                        'taco/lib/bx/intervalcluster.c'],
               include_dirs=['taco/lib/bx']),
     Extension('taco.lib.bx.intersection',
-              sources=['taco/lib/bx/intersection.pyx'])
+              sources=['taco/lib/bx/intersection.pyx']),
+    Extension('taco.lib.csuffixarray',
+              sources=['taco/lib/csuffixarray.pyx', 'taco/lib/sais.c'],
+              include_dirs=[numpy_inc])
 ]
 
 

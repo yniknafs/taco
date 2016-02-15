@@ -6,7 +6,7 @@
 # from scipy.stats import mannwhitneyu, percentileofscore
 # from taco.lib.base import TacoError, Strand
 # from taco.lib.dtypes import FLOAT_DTYPE
-# from taco.lib.cChangePoint import mse as mse_cython
+# from taco.lib.cchangepoint import mse as mse_cython
 # from taco.lib.changepoint import mse as mse_python
 # from taco.lib.changepoint import run_changepoint, smooth
 # 

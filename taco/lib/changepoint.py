@@ -6,7 +6,7 @@ from collections import namedtuple
 import numpy as np
 from scipy.stats import mannwhitneyu
 
-from taco.lib.cChangePoint import mse as mse_cython
+from taco.lib.cchangepoint import mse as mse_cython
 
 
 __author__ = "Matthew Iyer and Yashar Niknafs"

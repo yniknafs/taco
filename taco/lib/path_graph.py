@@ -4,10 +4,14 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 import logging
 import collections
 import networkx as nx
+from itertools import chain
+from array import array
+from bisect import bisect_right
 
 from base import Exon, Strand
 from splice_graph import split_transfrag
 from optimize import maximize_bisect
+from fmindex import FmIndex
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -156,13 +160,6 @@ def get_kmers(path, k):
         yield path[i:i+k]
 
 
-def get_path(sgraph, t):
-    nodes = [Exon(*n) for n in split_transfrag(t, sgraph.node_bounds)]
-    if sgraph.strand == Strand.NEG:
-        nodes.reverse()
-    return tuple(nodes)
-
-
 def get_node_lengths(sgraph, t):
     return [(n[1]-n[0]) for n in split_transfrag(t, sgraph.node_bounds)]
 
@@ -190,7 +187,7 @@ def create_path_graph(sgraph, k):
     current_id = 0
     for t in sgraph.itertransfrags():
         # get nodes
-        path = get_path(sgraph, t)
+        path = sgraph.get_path(t)
         # check for start and stop nodes
         is_start = (path[0] in start_nodes)
         is_end = (path[-1] in stop_nodes)
@@ -226,28 +223,88 @@ def create_path_graph(sgraph, k):
         add_path(K, path, expr)
     # remove nodes that are unreachable from the source or sink, these occur
     # due to fragmentation when k > 2
-    lost_kmers = {}
-    for kmer in get_unreachable_kmers(K, SOURCE, SINK):
-        if (kmer == SOURCE) or (kmer == SINK):
-            continue
-        lost_kmers[kmer] = K.node[kmer][KMER_EXPR]
-        del id_kmer_map[kmer]
-        K.remove_node(kmer)
+    num_lost_kmers = 0
+    for kmer_id in get_unreachable_kmers(K, SOURCE, SINK):
+        if (kmer_id != SOURCE) and (kmer_id != SINK):
+            num_lost_kmers += 1
+            kmer = id_kmer_map[kmer_id]
+            del kmer_id_map[kmer]
+            del id_kmer_map[kmer_id]
+        K.remove_node(kmer_id)
     # graph is invalid if there is no path from source to sink
     valid = is_graph_valid(K)
     # add graph attributes
     K.graph['k'] = k
     K.graph['source'] = SOURCE
     K.graph['sink'] = SINK
+    K.graph['kmer_id_map'] = kmer_id_map
     K.graph['id_kmer_map'] = id_kmer_map
     K.graph['short_transfrags'] = short_transfrags
-    K.graph['lost_kmers'] = lost_kmers
+    K.graph['num_lost_kmers'] = num_lost_kmers
     K.graph['valid'] = valid
     return K
 
 
+def align_short_transfrags(K):
+    # concatenate all kmers
+    logging.debug('Indexing')
+    kmer_id_map = K.graph['kmer_id_map']
+    T = []
+    Tstarts = []
+    Tlengths = []
+    i = 0
+    for kmer in kmer_id_map.iterkeys():
+        T.extend(kmer)
+        Tstarts.append(i)
+        Tlengths.append(len(kmer))
+        i += len(kmer)
+    T.append(0)
+    T = array('i', T)
+    # build FM index
+    fm = FmIndex(T, alphabet_size=len(K))
+    # align short transfrags to index
+    logging.debug('Aligning')
+    kmer_paths = []
+    lost_transfrags = []
+    for t, path in K.graph['short_transfrags']:
+        # align to find matching kmers
+        tot_expr = 0.0
+        matching_kmers = []
+        # logging.debug('t_id: %s path: %s' % (t._id, str(path)))
+        for i in fm.occurrences(path):
+            istart = bisect_right(Tstarts, i) - 1
+            start = Tstarts[istart]
+            end = start + Tlengths[istart]
+            kmer = tuple(T[start:end])
+            # logging.debug('t_id: %s path: %s kmer: %s' % (t._id, str(path), str(kmer)))
+            kmer_id = kmer_id_map[kmer]
+            kmer_expr = K.node[kmer_id][KMER_EXPR]
+            tot_expr += kmer_expr
+            matching_kmers.append((kmer_id, kmer_expr))
+        # calculate expression for matching kmers
+        matching_paths = []
+        for kmer_id, kmer_expr in matching_kmers:
+            if tot_expr == 0:
+                new_expr = t.expr / len(matching_kmers)
+            else:
+                new_expr = t.expr * (kmer_expr / tot_expr)
+            matching_paths.append(((kmer_id,), new_expr))
+        if len(matching_paths) == 0:
+            lost_transfrags.append(t)
+        kmer_paths.extend(matching_paths)
+    return kmer_paths, lost_transfrags
+
+
+def rescue_short_transfrags_fmindex(K):
+    kmer_paths, lost_transfrags = align_short_transfrags(K)
+    # add new paths
+    for path, expr in kmer_paths:
+        add_path(K, path, expr)
+    # add graph attributes
+    K.graph['lost_transfrags'] = lost_transfrags
+
+
 def rescue_short_transfrags(K):
-    '''create kmer graph from partial paths'''
     k = K.graph['k']
     id_kmer_map = K.graph['id_kmer_map']
     short_transfrag_dict = collections.defaultdict(list)
@@ -304,22 +361,22 @@ def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
         kmax = min(user_kmax, kmax)
     sgraph_id_str = '%s:%d-%d[%s]' % (sgraph.chrom, sgraph.start, sgraph.end,
                                       Strand.to_gtf(sgraph.strand))
-    tot_expr = sum(sgraph.get_expr_data(*n).mean() for n in sgraph.G)
+    tot_expr = sum(sgraph.get_node_expr_data(n).mean() for n in sgraph.G)
 
     def compute_kmers(k):
         K = create_path_graph(sgraph, k)
         valid = K.graph['valid']
         short_transfrags = K.graph['short_transfrags']
-        lost_kmers = K.graph['lost_kmers']
+        num_lost_kmers = K.graph['num_lost_kmers']
         lost_nodes = get_lost_nodes(sgraph, K)
-        lost_expr = sum(sgraph.get_expr_data(*n).mean() for n in lost_nodes)
+        lost_expr = sum(sgraph.get_node_expr_data(n).mean() for n in lost_nodes)
         lost_expr_frac = 0.0 if tot_expr == 0 else lost_expr / tot_expr
         logging.debug('%s k=%d kmax=%d t=%d n=%d kmers=%d short_transfrags=%d '
                       'lost_kmers=%d tot_expr=%.3f lost_expr=%.3f '
                       'lost_expr_frac=%.3f valid=%d' %
                       (sgraph_id_str, k, kmax, len(sgraph.transfrags),
                        len(sgraph.G), len(K), len(short_transfrags),
-                       len(lost_kmers), tot_expr, lost_expr,
+                       num_lost_kmers, tot_expr, lost_expr,
                        lost_expr_frac, int(valid)))
         if not valid:
             return -k
@@ -328,19 +385,23 @@ def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
         return len(K)
 
     k, num_kmers = maximize_bisect(compute_kmers, 1, kmax, 0)
+    logging.debug('Creating path graph k=%d num_kmers=%d' % (k, num_kmers))
     K = create_path_graph(sgraph, k)
-    rescue_short_transfrags(K)
+    logging.debug('Rescuing short transfrags')
+    rescue_short_transfrags_fmindex(K)
     return K, k
 
 
-def reconstruct_path(kmer_path, id_kmer_map, strand):
+def reconstruct_path(kmer_path, id_kmer_map, sgraph):
     # reconstruct path from kmer ids
     path = list(id_kmer_map[kmer_path[1]])
     path.extend(id_kmer_map[n][-1] for n in kmer_path[2:-1])
     # reverse negative stranded data so that all paths go from
     # small -> large genomic coords
-    if strand == Strand.NEG:
+    if sgraph.strand == Strand.NEG:
         path.reverse()
+    # convert from integer node labels to genome (start, end) tuples
+    path = [sgraph.get_node_interval(nid) for nid in path]
     # collapse contiguous nodes along path
     newpath = []
     chain = [path[0]]

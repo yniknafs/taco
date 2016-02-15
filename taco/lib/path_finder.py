@@ -40,6 +40,7 @@ def init_tmp_attributes(G):
         d[TMP_KMER_EXPR] = d[KMER_EXPR]
         d[PATH_MIN_SCORE] = MIN_SCORE
         d[PATH_PREV] = None
+    G.graph['topological_sort'] = nx.topological_sort(G)
 
 
 def clear_tmp_attributes(G):
@@ -50,12 +51,13 @@ def clear_tmp_attributes(G):
         del d[TMP_KMER_EXPR]
         del d[PATH_MIN_SCORE]
         del d[PATH_PREV]
+    del G.graph['topological_sort']
 
 
 def reset_path_attributes(G):
-    """
+    '''
     must call this before calling the dynamic programming algorithm
-    """
+    '''
     # reset path attributes
     for n, d in G.nodes_iter(data=True):
         d[PATH_MIN_SCORE] = MIN_SCORE
@@ -71,7 +73,7 @@ def dynprog_search(G, source):
     reset_path_attributes(G)
     G.node[source][PATH_MIN_SCORE] = G.node[source][TMP_KMER_EXPR]
     # topological sort allows each node to be visited exactly once
-    queue = collections.deque(nx.topological_sort(G))
+    queue = collections.deque(G.graph['topological_sort'])
     while queue:
         u = queue.popleft()
         path_min_score = G.node[u][PATH_MIN_SCORE]

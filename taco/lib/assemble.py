@@ -241,14 +241,17 @@ def assemble_isoforms(sgraph, config):
         stats_fh=config.path_graph_stats_fh)
     if K is None:
         return []
+    if len(K) == 0:
+        return []
 
     # report lost nodes
     if config.assembly_loss_gtf_fh is not None:
         graph_id = ('L_%s:%d-%d[%s]' %
                     (sgraph.chrom, sgraph.start, sgraph.end,
                      Strand.to_gtf(sgraph.strand)))
-        for n in get_lost_nodes(sgraph, K):
-            expr_data = sgraph.get_expr_data(*n)
+        for n_id in get_lost_nodes(sgraph, K):
+            n = sgraph.get_node_interval(n_id)
+            expr_data = sgraph.get_node_expr_data(n_id)
             # return gtf feature for each node
             f = GTF.Feature()
             f.seqid = sgraph.chrom
@@ -280,7 +283,7 @@ def assemble_isoforms(sgraph, config):
                                                  path_frac=config.path_frac,
                                                  max_paths=config.max_paths):
         # reconstruct path (remove source/sink)
-        path = reconstruct_path(kmer_path, id_kmer_map, sgraph.strand)
+        path = reconstruct_path(kmer_path, id_kmer_map, sgraph)
         logging.debug("\texpr=%f length=%d" % (expr, len(path)))
         paths.append((path, expr))
     # build gene clusters

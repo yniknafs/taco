@@ -8,7 +8,7 @@ import h5py
 
 from base import Strand, TacoError
 from dtypes import FLOAT_DTYPE, H5_CHUNKSIZE
-from cBedGraph import array_to_bedgraph
+from cbedgraph import array_to_bedgraph
 from splice_graph import SpliceGraph
 
 __author__ = "Matthew Iyer and Yashar Niknafs"

@@ -1,3 +1,6 @@
+'''
+TACO: Transcriptome meta-assembly from RNA-Seq
+'''
 import numpy as np
 cimport numpy as np
 cimport cython
