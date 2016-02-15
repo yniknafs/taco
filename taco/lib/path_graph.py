@@ -2,16 +2,12 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import logging
-import collections
 import networkx as nx
-from itertools import chain
-from array import array
-from bisect import bisect_right
 
 from base import Exon, Strand
 from splice_graph import split_transfrag
 from optimize import maximize_bisect
-from fmindex import FmIndex
+from csuffixarray import SuffixArrayIndex
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -95,39 +91,6 @@ def add_path(K, path, expr):
         from_id = to_id
     # the last kmer should be "smoothed" in forward direction
     kmerattrs[SMOOTH_FWD] += expr
-
-
-def hash_kmers(id_kmer_map, k, ksmall):
-    kmer_hash = collections.defaultdict(lambda: set())
-    for kmer_id, kmer in id_kmer_map.iteritems():
-        for i in xrange(k - (ksmall-1)):
-            kmer_hash[kmer[i:i+ksmall]].add(kmer_id)
-    return kmer_hash
-
-
-def find_short_path_kmers(kmer_hash, K, path, expr):
-    """
-    find kmers where 'path' is a subset and partition 'expr'
-    of path proportionally among all matching kmers
-
-    generator function yields (kmer_id, expr) tuples
-    """
-    if path not in kmer_hash:
-        return
-    matching_kmers = []
-    total_expr = 0.0
-    for kmer_id in kmer_hash[path]:
-        # compute total expr at matching kmers
-        kmer_expr = K.node[kmer_id][KMER_EXPR]
-        total_expr += kmer_expr
-        matching_kmers.append((kmer_id, kmer_expr))
-    # now calculate fractional densities for matching kmers
-    for kmer_id, kmer_expr in matching_kmers:
-        if total_expr == 0:
-            new_expr = expr / len(matching_kmers)
-        else:
-            new_expr = expr * (kmer_expr / total_expr)
-        yield ([kmer_id], new_expr)
 
 
 def get_unreachable_kmers(K, source=None, sink=None):
@@ -245,38 +208,20 @@ def create_path_graph(sgraph, k):
     return K
 
 
-def align_short_transfrags(K):
+def rescue_short_transfrags_saindex(K):
     # concatenate all kmers
-    logging.debug('Indexing')
     kmer_id_map = K.graph['kmer_id_map']
-    T = []
-    Tstarts = []
-    Tlengths = []
-    i = 0
-    for kmer in kmer_id_map.iterkeys():
-        T.extend(kmer)
-        Tstarts.append(i)
-        Tlengths.append(len(kmer))
-        i += len(kmer)
-    T.append(0)
-    T = array('i', T)
-    # build FM index
-    fm = FmIndex(T, alphabet_size=len(K))
+    # build suffix array index
+    sai = SuffixArrayIndex(kmer_id_map.iterkeys(), alphabet_size=len(K))
     # align short transfrags to index
-    logging.debug('Aligning')
     kmer_paths = []
     lost_transfrags = []
-    for t, path in K.graph['short_transfrags']:
+    short_transfrags = K.graph['short_transfrags']
+    for t, path in short_transfrags:
         # align to find matching kmers
         tot_expr = 0.0
         matching_kmers = []
-        # logging.debug('t_id: %s path: %s' % (t._id, str(path)))
-        for i in fm.occurrences(path):
-            istart = bisect_right(Tstarts, i) - 1
-            start = Tstarts[istart]
-            end = start + Tlengths[istart]
-            kmer = tuple(T[start:end])
-            # logging.debug('t_id: %s path: %s kmer: %s' % (t._id, str(path), str(kmer)))
+        for kmer in sai.search(path):
             kmer_id = kmer_id_map[kmer]
             kmer_expr = K.node[kmer_id][KMER_EXPR]
             tot_expr += kmer_expr
@@ -292,42 +237,13 @@ def align_short_transfrags(K):
         if len(matching_paths) == 0:
             lost_transfrags.append(t)
         kmer_paths.extend(matching_paths)
-    return kmer_paths, lost_transfrags
-
-
-def rescue_short_transfrags_fmindex(K):
-    kmer_paths, lost_transfrags = align_short_transfrags(K)
     # add new paths
     for path, expr in kmer_paths:
         add_path(K, path, expr)
     # add graph attributes
     K.graph['lost_transfrags'] = lost_transfrags
-
-
-def rescue_short_transfrags(K):
-    k = K.graph['k']
-    id_kmer_map = K.graph['id_kmer_map']
-    short_transfrag_dict = collections.defaultdict(list)
-    for t, path in K.graph['short_transfrags']:
-        # save fragmented short paths
-        short_transfrag_dict[len(path)].append((t, path))
-    # try to add short paths to graph if they are exact subpaths of
-    # existing kmers
-    kmer_paths = []
-    lost_transfrags = []
-    for ksmall, short_transfrag_paths in short_transfrag_dict.iteritems():
-        kmer_hash = hash_kmers(id_kmer_map, k, ksmall)
-        for t, path in short_transfrag_paths:
-            matching_paths = \
-                list(find_short_path_kmers(kmer_hash, K, path, t.expr))
-            if len(matching_paths) == 0:
-                lost_transfrags.append((t, path))
-            kmer_paths.extend(matching_paths)
-    # add new paths
-    for path, expr in kmer_paths:
-        add_path(K, path, expr)
-    # add graph attributes
-    K.graph['lost_transfrags'] = lost_transfrags
+    logging.debug('\tlost %d of %d short transfrags' %
+                  (len(lost_transfrags), len(short_transfrags)))
 
 
 def get_reachable_nodes(K):
@@ -388,7 +304,7 @@ def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
     logging.debug('Creating path graph k=%d num_kmers=%d' % (k, num_kmers))
     K = create_path_graph(sgraph, k)
     logging.debug('Rescuing short transfrags')
-    rescue_short_transfrags_fmindex(K)
+    rescue_short_transfrags_saindex(K)
     return K, k
 
 
