@@ -2,7 +2,6 @@
 TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import logging
-import collections
 import networkx as nx
 
 from path_graph import KMER_EXPR
@@ -20,155 +19,70 @@ __status__ = "Development"
 # constant minimum path score
 MIN_SCORE = 1.0e-10
 
-# for dynamic programming algorithm
-TMP_KMER_EXPR = 'tmpns'
-PATH_MIN_SCORE = 'pmin'
-PATH_PREV = 'pprev'
 
-imax2 = lambda x, y: x if x >= y else y
-imin2 = lambda x, y: x if x <= y else y
+def _subtract_path(ipath, expr, exprs):
+    for i in ipath:
+        new_expr = exprs[i] - expr
+        exprs[i] = MIN_SCORE if MIN_SCORE >= new_expr else new_expr
 
 
-def init_tmp_attributes(G):
-    '''
-    set node attributes that are added to the graph temporarily
-    '''
-    # copy the node weights to a temporary variable so that we can
-    # manipulation them in the algorithm and create path attributes
-    # for dynamic programming
-    for n, d in G.nodes_iter(data=True):
-        d[TMP_KMER_EXPR] = d[KMER_EXPR]
-        d[PATH_MIN_SCORE] = MIN_SCORE
-        d[PATH_PREV] = None
-    G.graph['topological_sort'] = nx.topological_sort(G)
-
-
-def clear_tmp_attributes(G):
-    '''
-    remove node attributes that are added to the graph temporarily
-    '''
-    for n, d in G.nodes_iter(data=True):
-        del d[TMP_KMER_EXPR]
-        del d[PATH_MIN_SCORE]
-        del d[PATH_PREV]
-    del G.graph['topological_sort']
-
-
-def reset_path_attributes(G):
-    '''
-    must call this before calling the dynamic programming algorithm
-    '''
-    # reset path attributes
-    for n, d in G.nodes_iter(data=True):
-        d[PATH_MIN_SCORE] = MIN_SCORE
-        d[PATH_PREV] = None
-
-
-def dynprog_search(G, source):
-    """
-    Find the highest scoring path by dynamic programming
-    # Adapted from NetworkX source code http://networkx.lanl.gov
-    """
-    # setup initial path attributes
-    reset_path_attributes(G)
-    G.node[source][PATH_MIN_SCORE] = G.node[source][TMP_KMER_EXPR]
-    # topological sort allows each node to be visited exactly once
-    queue = collections.deque(G.graph['topological_sort'])
-    while queue:
-        u = queue.popleft()
-        path_min_score = G.node[u][PATH_MIN_SCORE]
-        for v in G.successors_iter(u):
-            v_attrs = G.node[v]
-            v_score = v_attrs[TMP_KMER_EXPR]
-            # compute minimum score that would occur if path
-            # traversed through node 'v'
-            new_min_score = imin2(path_min_score, v_score)
-            # update if score is larger
-            if ((v_attrs[PATH_PREV] is None) or
-                (new_min_score > v_attrs[PATH_MIN_SCORE])):
-                v_attrs[PATH_MIN_SCORE] = new_min_score
-                v_attrs[PATH_PREV] = u
-
-
-def traceback(G, sink):
-    """
-    compute path and its score
-    """
-    path = [sink]
-    score = G.node[sink][PATH_MIN_SCORE]
-    prev = G.node[sink][PATH_PREV]
-    while prev is not None:
-        path.append(prev)
-        prev = G.node[prev][PATH_PREV]
-    path.reverse()
-    return tuple(path), score
-
-
-def find_path(G, source, sink):
-    """
-    G - graph
-    source, sink - start/end nodes
-    """
-    # dynamic programming search for best path
-    dynprog_search(G, source)
+def _find_path(nodes, exprs, succ, isource, isink):
+    min_exprs = [MIN_SCORE for i in xrange(len(exprs))]
+    min_exprs[isource] = exprs[isource]
+    prevs = [None for i in xrange(len(exprs))]
+    for i in xrange(len(exprs)):
+        min_expr = min_exprs[i]
+        for j in succ[i]:
+            new_min_expr = min_expr if min_expr < exprs[j] else exprs[j]
+            if (prevs[j] is None) or (new_min_expr > min_exprs[j]):
+                min_exprs[j] = new_min_expr
+                prevs[j] = i
     # traceback to get path
-    path, score = traceback(G, sink)
-    return path, score
+    expr = min_exprs[isink]
+    ipath = [isink]
+    prev = prevs[isink]
+    while prev is not None:
+        ipath.append(prev)
+        prev = prevs[prev]
+    ipath.reverse()
+    _subtract_path(ipath, expr, exprs)
+    path = tuple(nodes[i] for i in ipath)
+    return path, expr
 
 
-def subtract_path(G, path, score):
-    """
-    subtract score from nodes along path
-    """
-    for i in xrange(len(path)):
-        u = path[i]
-        d = G.node[u]
-        d[TMP_KMER_EXPR] = imax2(MIN_SCORE,
-                                 d[TMP_KMER_EXPR] - score)
+def find_paths(G, source, sink, path_frac=0, max_paths=0):
+    # initialize path finding
+    nodes = nx.topological_sort(G)
+    indexes = dict((n, i) for i, n in enumerate(nodes))
+    isource, isink = 0, len(nodes)-1
+    exprs = []
+    succ = []
+    for n in nodes:
+        exprs.append(G.node[n][KMER_EXPR])
+        succ.append([indexes[x] for x in G.successors_iter(n)])
 
-
-def find_suboptimal_paths(G, source, sink, path_frac=1e-5, max_paths=0):
-    """
-    finds suboptimal paths through graph G using a greedy algorithm that
-    finds the highest score path using dynamic programming, subtracts
-    the path score from the graph, and repeats
-
-    paths with score lower than 'fraction_major_path' are not
-    returned.  algorithm may stop prematurely if 'max_paths' iterations
-    have completed.
-    """
-    # setup temporary graph attributes
-    init_tmp_attributes(G)
-    # store paths in a dictionary in order to avoid redundant paths
-    # that arise if the heuristic assumptions of the algorithm fail
-    path_results = collections.OrderedDict()
     # define threshold score to stop producing suboptimal paths
-    max_score = G.node[source][KMER_EXPR]
-    if max_score < MIN_SCORE:
+    max_expr = exprs[isource]
+    if max_expr < MIN_SCORE:
         return []
-    lowest_score = G.node[source][KMER_EXPR] * path_frac
-    lowest_score = max(MIN_SCORE, lowest_score)
+    lowest_expr = max_expr * path_frac
+    lowest_expr = max(MIN_SCORE, lowest_expr)
+
     # find highest scoring path
-    path, score = find_path(G, source, sink)
-    path_results[path] = score
-    subtract_path(G, path, score)
+    path, expr = _find_path(nodes, exprs, succ, isource, isink)
+    results = [(path, expr)]
     # iterate to find suboptimal paths
     iterations = 1
     while True:
         if max_paths > 0 and iterations >= max_paths:
             break
         # find path
-        path, score = find_path(G, source, sink)
-        if score <= lowest_score:
+        path, expr = _find_path(nodes, exprs, succ, isource, isink)
+        if expr <= lowest_expr:
             break
         # store path
-        if path not in path_results:
-            path_results[path] = score
-        # subtract path score from graph and resort seed nodes
-        subtract_path(G, path, score)
+        results.append((path, expr))
         iterations += 1
     logging.debug("\tpath finding iterations=%d" % iterations)
-    # cleanup graph attributes
-    clear_tmp_attributes(G)
     # return (path,score) tuples sorted from high -> low score
-    return path_results.items()
+    return results

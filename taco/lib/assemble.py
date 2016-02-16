@@ -11,7 +11,7 @@ from transfrag import Transfrag
 from locus import Locus
 from path_graph import KMER_EXPR, smooth_graph, reconstruct_path, \
     create_optimal_path_graph, get_lost_nodes
-from path_finder import find_suboptimal_paths
+from path_finder import find_paths
 from bx.cluster import ClusterTree
 
 
@@ -277,12 +277,12 @@ def assemble_isoforms(sgraph, config):
                    Strand.to_gtf(sgraph.strand), k, len(K),
                    source_expr))
     id_kmer_map = K.graph['id_kmer_map']
+
     paths = []
-    for kmer_path, expr in find_suboptimal_paths(K, K.graph['source'],
-                                                 K.graph['sink'],
-                                                 path_frac=config.path_frac,
-                                                 max_paths=config.max_paths):
-        # reconstruct path (remove source/sink)
+    for kmer_path, expr in find_paths(K, K.graph['source'],
+                                      K.graph['sink'],
+                                      path_frac=config.path_frac,
+                                      max_paths=config.max_paths):
         path = reconstruct_path(kmer_path, id_kmer_map, sgraph)
         logging.debug("\texpr=%f length=%d" % (expr, len(path)))
         paths.append((path, expr))
