@@ -12,7 +12,6 @@ from locus import Locus
 from path_graph import KMER_EXPR, smooth_graph, reconstruct_path, \
     create_optimal_path_graph, get_lost_nodes
 from path_finder import find_paths
-from bx.cluster import ClusterTree
 
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
@@ -60,31 +59,29 @@ class Config(object):
         self.max_paths = 0
         self.isoform_frac = 0
         self.max_isoforms = 0
-        self.relative_frac = False
         return self
 
 
 class Isoform(object):
-    __slots__ = ('expr', 'path', 'gene_frac', 'path_frac',
+    __slots__ = ('expr', 'path', 'rel_frac', 'abs_frac',
                  'gene_id', 'tss_id')
 
-    def __init__(self, path=None, expr=0.0, path_frac=1.0, gene_frac=1.0):
+    def __init__(self, path=None, expr=0.0, rel_frac=1.0, abs_frac=1.0):
         self.path = path
         self.expr = expr
-        self.path_frac = path_frac
-        self.gene_frac = gene_frac
+        self.rel_frac = rel_frac
+        self.abs_frac = abs_frac
         self.gene_id = -1
         self.tss_id = -1
 
 
 class Cluster(object):
 
-    def __init__(self, relative_frac=False):
+    def __init__(self):
         self._id = 0
         self.expr = 1e-10
         self.nodes = set()
         self.paths = []
-        self.relative_frac = relative_frac
 
     def __len__(self):
         return len(self.paths)
@@ -97,12 +94,11 @@ class Cluster(object):
     def iterpaths(self):
         if len(self.paths) == 0:
             return
+        best_expr = self.paths[0][1]
         for path, expr in self.paths:
-            if self.relative_frac:
-                frac = expr / self.paths[0][1]
-            else:
-                frac = expr / self.expr
-            yield path, expr, frac
+            rel_frac = 0.0 if best_expr == 0.0 else expr / best_expr
+            abs_frac = 0.0 if self.expr == 0.0 else expr / self.expr
+            yield path, expr, rel_frac, abs_frac
 
     def merge(self, *others):
         for other in others:
@@ -112,7 +108,7 @@ class Cluster(object):
         self.paths.sort(key=itemgetter(1), reverse=True)
 
     @staticmethod
-    def build(paths, min_frac=0.0, relative_frac=False):
+    def build(paths, min_frac=0.0):
         filtered = []
         clusters = {}
         _id = 0
@@ -123,25 +119,24 @@ class Cluster(object):
                        if not c.nodes.isdisjoint(path)]
             if len(matches) == 0:
                 # make new cluster
-                c = Cluster(relative_frac)
+                c = Cluster()
                 c._id = _id
                 _id += 1
                 clusters[c._id] = c
             else:
                 # check frac in all clusters
-                if relative_frac:
-                    fracs = []
-                    for c in clusters.itervalues():
-                        best_expr = c.paths[0][1] + 1e-10
-                        fracs.append(expr / best_expr)
-                else:
-                    fracs = [(expr / (c.expr + expr))
-                             for c in clusters.itervalues()]
-                if any((x < min_frac) for x in fracs):
+                discard = False
+                for c in clusters.itervalues():
+                    best_expr = c.paths[0][1]
+                    rel_frac = 0.0 if best_expr == 0.0 else expr / best_expr
+                    if rel_frac < min_frac:
+                        discard = True
+                        break
+                if discard:
                     filtered.append((path, expr))
                     continue
-                c = matches[0]
                 # merge clusters
+                c = matches[0]
                 c.merge(*matches[1:])
                 for c2 in matches[1:]:
                     del clusters[c2._id]
@@ -163,7 +158,7 @@ class LockValue(object):
 
 
 def get_gtf_features(chrom, strand, exons, locus_id, gene_id, tss_id,
-                     transcript_id, expr, gene_frac, path_frac):
+                     transcript_id, expr, rel_frac, abs_frac):
     tx_start = exons[0].start
     tx_end = exons[-1].end
     strand_str = Strand.to_gtf(strand)
@@ -177,12 +172,12 @@ def get_gtf_features(chrom, strand, exons, locus_id, gene_id, tss_id,
     f.feature = 'transcript'
     f.start = tx_start
     f.end = tx_end
-    f.score = int(round(1000.0 * gene_frac))
+    f.score = int(round(1000.0 * rel_frac))
     f.strand = strand_str
     f.phase = '.'
     f.attrs = {'expr': '%.3f' % expr,
-               'frac': '%.3f' % gene_frac,
-               'path_frac': '%.3f' % path_frac}
+               'rel_frac': '%.5f' % rel_frac,
+               'abs_frac': '%.5f' % abs_frac}
     f.attrs.update(attr_dict)
     yield f
     for e in exons:
@@ -192,7 +187,7 @@ def get_gtf_features(chrom, strand, exons, locus_id, gene_id, tss_id,
         f.feature = 'exon'
         f.start = e.start
         f.end = e.end
-        f.score = int(round(1000.0 * gene_frac))
+        f.score = int(round(1000.0 * rel_frac))
         f.strand = strand_str
         f.phase = '.'
         f.attrs = {}
@@ -294,28 +289,20 @@ def assemble_isoforms(sgraph, config):
     for kmer_path, expr in find_paths(K, K.graph['source'],
                                       K.graph['sink'],
                                       path_frac=config.path_frac,
-                                      max_paths=config.max_paths,
-                                      relative_frac=config.relative_frac):
+                                      max_paths=config.max_paths):
         path = reconstruct_path(kmer_path, id_kmer_map, sgraph)
         logging.debug("\texpr=%f length=%d" % (expr, len(path)))
         paths.append((path, expr))
     # build gene clusters
-    clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac,
-                                       relative_frac=config.relative_frac)
+    clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac)
     logging.debug('\tclusters: %d filtered: %d' %
                   (len(clusters), len(filtered)))
     gene_isoforms = []
-    if len(paths) > 0:
-        if config.relative_frac:
-            max_expr = paths[0][1]
-        else:
-            max_expr = source_expr
     for cluster in clusters:
         isoforms = []
-        for path, expr, gene_frac in cluster.iterpaths():
-            isoforms.append(Isoform(path=path, expr=expr,
-                                    path_frac=(expr / max_expr),
-                                    gene_frac=gene_frac))
+        for path, expr, rel_frac, abs_frac in cluster.iterpaths():
+            isoforms.append(Isoform(path=path, expr=expr, rel_frac=rel_frac,
+                                    abs_frac=abs_frac))
         # apply max isoforms limit (per cluster)
         if config.max_isoforms > 0:
             isoforms = isoforms[:config.max_isoforms]
@@ -370,13 +357,13 @@ def assemble_gene(sgraph, locus_id_str, config):
                                       tss_id=tss_id_str,
                                       transcript_id=t_id_str,
                                       expr=isoform.expr,
-                                      gene_frac=isoform.gene_frac,
-                                      path_frac=isoform.path_frac):
+                                      rel_frac=isoform.rel_frac,
+                                      abs_frac=isoform.abs_frac):
                 print >>config.assembly_gtf_fh, str(f)
             # write to BED
             name = "%s|%s(%.1f)" % (gene_id_str, t_id_str, isoform.expr)
             fields = write_bed(sgraph.chrom, name, sgraph.strand,
-                               int(round(1000.0 * isoform.gene_frac)),
+                               int(round(1000.0 * isoform.rel_frac)),
                                isoform.path)
             print >>config.assembly_bed_fh, '\t'.join(fields)
 
@@ -432,7 +419,6 @@ def assemble(**kwargs):
     - max_paths
     - isoform_frac
     - max_isoforms
-    - relative_frac
 
     Input file attributes:
     - transfrags_gtf_file

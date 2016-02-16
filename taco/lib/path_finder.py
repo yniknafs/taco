@@ -50,7 +50,7 @@ def _find_path(nodes, exprs, succ, isource, isink):
     return path, expr
 
 
-def find_paths(G, source, sink, path_frac=0, max_paths=0, relative_frac=False):
+def find_paths(G, source, sink, path_frac=0, max_paths=0):
     # initialize path finding
     nodes = nx.topological_sort(G)
     indexes = dict((n, i) for i, n in enumerate(nodes))
@@ -60,22 +60,15 @@ def find_paths(G, source, sink, path_frac=0, max_paths=0, relative_frac=False):
     for n in nodes:
         exprs.append(G.node[n][KMER_EXPR])
         succ.append([indexes[x] for x in G.successors_iter(n)])
-
     # don't run if all nodes are zero
     if exprs[isource] < MIN_SCORE:
         return []
-
     # find highest scoring path
     path, expr = _find_path(nodes, exprs, succ, isource, isink)
     results = [(path, expr)]
-
     # define threshold score to stop producing suboptimal paths
-    if relative_frac:
-        lowest_expr = expr * path_frac
-    else:
-        lowest_expr = exprs[isource] * path_frac
+    lowest_expr = expr * path_frac
     lowest_expr = max(MIN_SCORE, lowest_expr)
-
     # iterate to find suboptimal paths
     iterations = 1
     while True:
@@ -89,5 +82,4 @@ def find_paths(G, source, sink, path_frac=0, max_paths=0, relative_frac=False):
         results.append((path, expr))
         iterations += 1
     logging.debug("\tpath finding iterations=%d" % iterations)
-    # return (path,score) tuples sorted from high -> low score
     return results

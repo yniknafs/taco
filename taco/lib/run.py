@@ -178,16 +178,6 @@ class Args:
                             default=Args.MAX_PATHS,
                             help='dynamic programming algorithm will stop '
                             'after finding N paths [default=%(default)s]')
-        advgrp.add_argument('--relative-frac', dest='relative_frac',
-                            action='store_true',
-                            default=Args.RELATIVE_FRAC,
-                            help='Compute isoform fraction relative to '
-                            'highest expression isoform in gene. By default, '
-                            'TACO computes absolute fraction compared to the '
-                            'total gene expression [default=%(default)s]')
-        advgrp.add_argument('--no-relative-frac', dest='relative_frac',
-                            action='store_false',
-                            help='Disable relative isoform fraction')
         parser.add_argument('sample_file', nargs='?')
         return parser
 
@@ -225,7 +215,6 @@ class Args:
                         args.path_graph_loss_threshold))
         func(fmt.format('path frac:', args.path_frac))
         func(fmt.format('max paths:', args.max_paths))
-        func(fmt.format('relative isoform fraction:', args.relative_frac))
 
     @staticmethod
     def parse():
