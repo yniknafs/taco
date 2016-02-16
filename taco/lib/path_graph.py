@@ -261,8 +261,8 @@ def get_lost_nodes(sgraph, K):
     return set(sgraph.G) - get_reachable_nodes(K)
 
 
-def create_optimal_path_graph(sgraph, frag_length=400, kmax=0,
-                              loss_threshold=0.10, stats_fh=None):
+def create_optimal_path_graph(sgraph, kmax=0, loss_threshold=0.10,
+                              stats_fh=None):
     '''
     create a path graph from the original splice graph using paths of length
     'k' for assembly. The parameter 'k' will be chosen by maximizing the

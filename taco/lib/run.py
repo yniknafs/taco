@@ -42,9 +42,9 @@ class Args:
     CHANGE_POINT_TRIM = True
     PATH_GRAPH_KMAX = 0
     PATH_GRAPH_LOSS_THRESHOLD = 0.10
-    PATH_GRAPH_FRAG_LENGTH = 400
     PATH_FRAC = 0.0
     MAX_PATHS = 0
+    RELATIVE_FRAC = False
     RESUME = False
     OUTPUT_DIR = 'taco'
     PROG = 'taco'
@@ -166,12 +166,6 @@ class Args:
                             help='Tolerate loss of X (0.0-1.0) fraction of '
                             'total gene expression while optimizing the '
                             'assembly parameter "k" [default=%(default)s]')
-        advgrp.add_argument('--path-graph-frag-length',
-                            dest='path_graph_frag_length',
-                            type=int, metavar='N',
-                            default=Args.PATH_GRAPH_FRAG_LENGTH,
-                            help='Length (bp) of largest valid fragment '
-                            'across all experiments [default=%(default)s]')
         advgrp.add_argument('--path-frac', type=float, metavar='X',
                             dest='path_frac',
                             default=Args.PATH_FRAC,
@@ -184,6 +178,16 @@ class Args:
                             default=Args.MAX_PATHS,
                             help='dynamic programming algorithm will stop '
                             'after finding N paths [default=%(default)s]')
+        advgrp.add_argument('--relative-frac', dest='relative_frac',
+                            action='store_true',
+                            default=Args.RELATIVE_FRAC,
+                            help='Compute isoform fraction relative to '
+                            'highest expression isoform in gene. By default, '
+                            'TACO computes absolute fraction compared to the '
+                            'total gene expression [default=%(default)s]')
+        advgrp.add_argument('--no-relative-frac', dest='relative_frac',
+                            action='store_false',
+                            help='Disable relative isoform fraction')
         parser.add_argument('sample_file', nargs='?')
         return parser
 
@@ -217,12 +221,11 @@ class Args:
                         str(args.change_point_fold_change)))
         func(fmt.format('change point trim:', str(args.change_point_trim)))
         func(fmt.format('min fragment length:', args.min_frag_length))
-        func(fmt.format('max fragment length:', args.path_graph_frag_length))
         func(fmt.format('path graph loss threshold:',
                         args.path_graph_loss_threshold))
         func(fmt.format('path frac:', args.path_frac))
         func(fmt.format('max paths:', args.max_paths))
-        return
+        func(fmt.format('relative isoform fraction:', args.relative_frac))
 
     @staticmethod
     def parse():
@@ -266,8 +269,6 @@ class Args:
             if (args.max_isoforms < 0):
                 parser.error("max_isoforms < 0")
 
-            if args.path_graph_frag_length < 0:
-                parser.error("path_graph_frag_length < 0")
             if not (0 <= args.path_graph_loss_threshold <= 1):
                 parser.error("loss_threshold not in range (0.0-1.0)")
             if args.path_graph_kmax < 0:

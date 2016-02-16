@@ -56,11 +56,11 @@ class Config(object):
         self.change_point_trim = True
         self.path_graph_kmax = 0
         self.path_graph_loss_threshold = 0.10
-        self.path_graph_frag_length = 400
         self.path_frac = 0
         self.max_paths = 0
         self.isoform_frac = 0
         self.max_isoforms = 0
+        self.relative_frac = False
         return self
 
 
@@ -79,11 +79,12 @@ class Isoform(object):
 
 class Cluster(object):
 
-    def __init__(self):
+    def __init__(self, relative_frac=False):
         self._id = 0
         self.expr = 1e-10
         self.nodes = set()
         self.paths = []
+        self.relative_frac = relative_frac
 
     def __len__(self):
         return len(self.paths)
@@ -94,8 +95,14 @@ class Cluster(object):
         self.paths.append((path, expr))
 
     def iterpaths(self):
+        if len(self.paths) == 0:
+            return
         for path, expr in self.paths:
-            yield path, expr, (expr / self.expr)
+            if self.relative_frac:
+                frac = expr / self.paths[0][1]
+            else:
+                frac = expr / self.expr
+            yield path, expr, frac
 
     def merge(self, *others):
         for other in others:
@@ -105,7 +112,7 @@ class Cluster(object):
         self.paths.sort(key=itemgetter(1), reverse=True)
 
     @staticmethod
-    def build(paths, min_frac=0.0):
+    def build(paths, min_frac=0.0, relative_frac=False):
         filtered = []
         clusters = {}
         _id = 0
@@ -116,14 +123,20 @@ class Cluster(object):
                        if not c.nodes.isdisjoint(path)]
             if len(matches) == 0:
                 # make new cluster
-                c = Cluster()
+                c = Cluster(relative_frac)
                 c._id = _id
                 _id += 1
                 clusters[c._id] = c
             else:
                 # check frac in all clusters
-                fracs = [(expr / (c.expr + expr))
-                         for c in clusters.itervalues()]
+                if relative_frac:
+                    fracs = []
+                    for c in clusters.itervalues():
+                        best_expr = c.paths[0][1] + 1e-10
+                        fracs.append(expr / best_expr)
+                else:
+                    fracs = [(expr / (c.expr + expr))
+                             for c in clusters.itervalues()]
                 if any((x < min_frac) for x in fracs):
                     filtered.append((path, expr))
                     continue
@@ -235,7 +248,6 @@ def assemble_isoforms(sgraph, config):
     # create a path graph from the splice graph
     K, k = create_optimal_path_graph(
         sgraph,
-        frag_length=config.path_graph_frag_length,
         kmax=config.path_graph_kmax,
         loss_threshold=config.path_graph_loss_threshold,
         stats_fh=config.path_graph_stats_fh)
@@ -282,21 +294,28 @@ def assemble_isoforms(sgraph, config):
     for kmer_path, expr in find_paths(K, K.graph['source'],
                                       K.graph['sink'],
                                       path_frac=config.path_frac,
-                                      max_paths=config.max_paths):
+                                      max_paths=config.max_paths,
+                                      relative_frac=config.relative_frac):
         path = reconstruct_path(kmer_path, id_kmer_map, sgraph)
         logging.debug("\texpr=%f length=%d" % (expr, len(path)))
         paths.append((path, expr))
     # build gene clusters
-    clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac)
+    clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac,
+                                       relative_frac=config.relative_frac)
     logging.debug('\tclusters: %d filtered: %d' %
                   (len(clusters), len(filtered)))
     gene_isoforms = []
+    if len(paths) > 0:
+        if config.relative_frac:
+            max_expr = paths[0][1]
+        else:
+            max_expr = source_expr
     for cluster in clusters:
         isoforms = []
-        for path, expr, frac in cluster.iterpaths():
+        for path, expr, gene_frac in cluster.iterpaths():
             isoforms.append(Isoform(path=path, expr=expr,
-                                    path_frac=(expr / source_expr),
-                                    gene_frac=(expr / cluster.expr)))
+                                    path_frac=(expr / max_expr),
+                                    gene_frac=gene_frac))
         # apply max isoforms limit (per cluster)
         if config.max_isoforms > 0:
             isoforms = isoforms[:config.max_isoforms]
@@ -409,11 +428,11 @@ def assemble(**kwargs):
     - change_point_trim
     - path_graph_kmax
     - path_graph_loss_threshold
-    - path_graph_frag_length
     - path_frac
     - max_paths
     - isoform_frac
     - max_isoforms
+    - relative_frac
 
     Input file attributes:
     - transfrags_gtf_file
