@@ -11,7 +11,7 @@ from transfrag import Transfrag
 from locus import Locus
 from path_graph import KMER_EXPR, smooth_graph, reconstruct_path, \
     create_optimal_path_graph, get_lost_nodes
-from path_finder import find_paths
+from cpathfinder import find_paths
 
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
@@ -286,10 +286,8 @@ def assemble_isoforms(sgraph, config):
     id_kmer_map = K.graph['id_kmer_map']
 
     paths = []
-    for kmer_path, expr in find_paths(K, K.graph['source'],
-                                      K.graph['sink'],
-                                      path_frac=config.path_frac,
-                                      max_paths=config.max_paths):
+    for kmer_path, expr in find_paths(K, KMER_EXPR, config.path_frac,
+                                      config.max_paths):
         path = reconstruct_path(kmer_path, id_kmer_map, sgraph)
         logging.debug("\texpr=%f length=%d" % (expr, len(path)))
         paths.append((path, expr))

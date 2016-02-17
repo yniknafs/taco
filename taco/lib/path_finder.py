@@ -4,7 +4,6 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 import logging
 import networkx as nx
 
-from path_graph import KMER_EXPR
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -50,7 +49,7 @@ def _find_path(nodes, exprs, succ, isource, isink):
     return path, expr
 
 
-def find_paths(G, source, sink, path_frac=0, max_paths=0):
+def find_paths(G, expr_attr, path_frac=0, max_paths=0):
     # initialize path finding
     nodes = nx.topological_sort(G)
     indexes = dict((n, i) for i, n in enumerate(nodes))
@@ -58,8 +57,9 @@ def find_paths(G, source, sink, path_frac=0, max_paths=0):
     exprs = []
     succ = []
     for n in nodes:
-        exprs.append(G.node[n][KMER_EXPR])
+        exprs.append(G.node[n][expr_attr])
         succ.append([indexes[x] for x in G.successors_iter(n)])
+
     # don't run if all nodes are zero
     if exprs[isource] < MIN_SCORE:
         return []

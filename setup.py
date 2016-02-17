@@ -32,8 +32,9 @@ extensions = [
     Extension('taco.lib.bx.intersection',
               sources=['taco/lib/bx/intersection.pyx']),
     Extension('taco.lib.csuffixarray',
-              sources=['taco/lib/csuffixarray.pyx', 'taco/lib/sais.c'],
-              include_dirs=[numpy_inc])
+              sources=['taco/lib/csuffixarray.pyx', 'taco/lib/sais.c']),
+    Extension('taco.lib.cpathfinder',
+              sources=['taco/lib/cpathfinder.pyx'])
 ]
 
 

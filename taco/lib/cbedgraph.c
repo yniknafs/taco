@@ -248,8 +248,8 @@ static CYTHON_INLINE float __PYX_NAN() {
   #endif
 #endif
 
-#define __PYX_HAVE__taco__lib__cBedGraph
-#define __PYX_HAVE_API__taco__lib__cBedGraph
+#define __PYX_HAVE__taco__lib__cbedgraph
+#define __PYX_HAVE_API__taco__lib__cbedgraph
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"
@@ -485,7 +485,7 @@ static const char *__pyx_filename;
 
 
 static const char *__pyx_f[] = {
-  "taco/lib/cBedGraph.pyx",
+  "taco/lib/cbedgraph.pyx",
   "__init__.pxd",
   "type.pxd",
 };
@@ -718,8 +718,16 @@ typedef npy_longdouble __pyx_t_5numpy_longdouble_t;
  * cimport numpy as np
  * 
  * ctypedef np.float32_t FLOAT_DTYPE_t             # <<<<<<<<<<<<<<
+ * ctypedef np.int_t INT_DTYPE_t
  */
 typedef __pyx_t_5numpy_float32_t __pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t;
+
+/* "dtypes.pxd":4
+ * 
+ * ctypedef np.float32_t FLOAT_DTYPE_t
+ * ctypedef np.int_t INT_DTYPE_t             # <<<<<<<<<<<<<<
+ */
+typedef __pyx_t_5numpy_int_t __pyx_t_4taco_3lib_6dtypes_INT_DTYPE_t;
 #if CYTHON_CCOMPLEX
   #ifdef __cplusplus
     typedef ::std::complex< float > __pyx_t_float_complex;
@@ -1121,13 +1129,13 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *, cha
 
 /* Module declarations from 'taco.lib.dtypes' */
 
-/* Module declarations from 'taco.lib.cBedGraph' */
-static PyTypeObject *__pyx_ptype_4taco_3lib_9cBedGraph_file = 0;
+/* Module declarations from 'taco.lib.cbedgraph' */
+static PyTypeObject *__pyx_ptype_4taco_3lib_9cbedgraph_file = 0;
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t = { "FLOAT_DTYPE_t", NULL, sizeof(__pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t), { 0 }, 0, 'R', 0, 0 };
-#define __Pyx_MODULE_NAME "taco.lib.cBedGraph"
-int __pyx_module_is_main_taco__lib__cBedGraph = 0;
+#define __Pyx_MODULE_NAME "taco.lib.cbedgraph"
+int __pyx_module_is_main_taco__lib__cbedgraph = 0;
 
-/* Implementation of 'taco.lib.cBedGraph' */
+/* Implementation of 'taco.lib.cbedgraph' */
 static PyObject *__pyx_builtin_xrange;
 static PyObject *__pyx_builtin_ValueError;
 static PyObject *__pyx_builtin_range;
@@ -1173,9 +1181,10 @@ static char __pyx_k_ValueError[] = "ValueError";
 static char __pyx_k_FLOAT_DTYPE[] = "FLOAT_DTYPE";
 static char __pyx_k_RuntimeError[] = "RuntimeError";
 static char __pyx_k_array_to_bedgraph[] = "array_to_bedgraph";
-static char __pyx_k_taco_lib_cBedGraph[] = "taco.lib.cBedGraph";
+static char __pyx_k_taco_lib_cbedgraph[] = "taco.lib.cbedgraph";
 static char __pyx_k_ndarray_is_not_C_contiguous[] = "ndarray is not C contiguous";
-static char __pyx_k_Users_mkiyer_git_taco_taco_lib[] = "/Users/mkiyer/git/taco/taco/lib/cBedGraph.pyx";
+static char __pyx_k_Users_mkiyer_git_taco_taco_lib[] = "/Users/mkiyer/git/taco/taco/lib/cbedgraph.pyx";
+static char __pyx_k_TACO_Transcriptome_meta_assembl[] = "\nTACO: Transcriptome meta-assembly from RNA-Seq\n";
 static char __pyx_k_unknown_dtype_code_in_numpy_pxd[] = "unknown dtype code in numpy.pxd (%d)";
 static char __pyx_k_Format_string_allocated_too_shor[] = "Format string allocated too short, see comment in numpy.pxd";
 static char __pyx_k_Non_native_byte_order_not_suppor[] = "Non-native byte order not supported";
@@ -1209,12 +1218,12 @@ static PyObject *__pyx_n_s_range;
 static PyObject *__pyx_n_s_ref;
 static PyObject *__pyx_kp_s_s_d_d_f;
 static PyObject *__pyx_n_s_start;
-static PyObject *__pyx_n_s_taco_lib_cBedGraph;
+static PyObject *__pyx_n_s_taco_lib_cbedgraph;
 static PyObject *__pyx_n_s_test;
 static PyObject *__pyx_kp_u_unknown_dtype_code_in_numpy_pxd;
 static PyObject *__pyx_n_s_val;
 static PyObject *__pyx_n_s_xrange;
-static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_a, char *__pyx_v_ref, int __pyx_v_start, PyFileObject *__pyx_v_fileh); /* proto */
+static PyObject *__pyx_pf_4taco_3lib_9cbedgraph_array_to_bedgraph(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_a, char *__pyx_v_ref, int __pyx_v_start, PyFileObject *__pyx_v_fileh); /* proto */
 static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
 static PyObject *__pyx_tuple_;
@@ -1226,7 +1235,7 @@ static PyObject *__pyx_tuple__6;
 static PyObject *__pyx_tuple__7;
 static PyObject *__pyx_codeobj__8;
 
-/* "taco/lib/cBedGraph.pyx":29
+/* "taco/lib/cbedgraph.pyx":28
  * 
  * # Now declare the C function that requires a file:
  * cdef void c_write(FILE* fp, char* ref, int start, int end, FLOAT_DTYPE_t val):             # <<<<<<<<<<<<<<
@@ -1234,11 +1243,11 @@ static PyObject *__pyx_codeobj__8;
  * 
  */
 
-static void __pyx_f_4taco_3lib_9cBedGraph_c_write(FILE *__pyx_v_fp, char *__pyx_v_ref, int __pyx_v_start, int __pyx_v_end, __pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t __pyx_v_val) {
+static void __pyx_f_4taco_3lib_9cbedgraph_c_write(FILE *__pyx_v_fp, char *__pyx_v_ref, int __pyx_v_start, int __pyx_v_end, __pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t __pyx_v_val) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("c_write", 0);
 
-  /* "taco/lib/cBedGraph.pyx":30
+  /* "taco/lib/cbedgraph.pyx":29
  * # Now declare the C function that requires a file:
  * cdef void c_write(FILE* fp, char* ref, int start, int end, FLOAT_DTYPE_t val):
  *     fprintf(fp, C_FMT_STRING, ref, start, end, val)             # <<<<<<<<<<<<<<
@@ -1247,7 +1256,7 @@ static void __pyx_f_4taco_3lib_9cBedGraph_c_write(FILE *__pyx_v_fp, char *__pyx_
  */
   fprintf(__pyx_v_fp, __pyx_k_s_d_d_f, __pyx_v_ref, __pyx_v_start, __pyx_v_end, __pyx_v_val);
 
-  /* "taco/lib/cBedGraph.pyx":29
+  /* "taco/lib/cbedgraph.pyx":28
  * 
  * # Now declare the C function that requires a file:
  * cdef void c_write(FILE* fp, char* ref, int start, int end, FLOAT_DTYPE_t val):             # <<<<<<<<<<<<<<
@@ -1259,7 +1268,7 @@ static void __pyx_f_4taco_3lib_9cBedGraph_c_write(FILE *__pyx_v_fp, char *__pyx_
   __Pyx_RefNannyFinishContext();
 }
 
-/* "taco/lib/cBedGraph.pyx":35
+/* "taco/lib/cbedgraph.pyx":33
  * 
  * @cython.boundscheck(False)
  * def array_to_bedgraph(np.ndarray[FLOAT_DTYPE_t, ndim=1] a,             # <<<<<<<<<<<<<<
@@ -1268,9 +1277,9 @@ static void __pyx_f_4taco_3lib_9cBedGraph_c_write(FILE *__pyx_v_fp, char *__pyx_
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_4taco_3lib_9cBedGraph_1array_to_bedgraph(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_4taco_3lib_9cBedGraph_1array_to_bedgraph = {"array_to_bedgraph", (PyCFunction)__pyx_pw_4taco_3lib_9cBedGraph_1array_to_bedgraph, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_4taco_3lib_9cBedGraph_1array_to_bedgraph(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4taco_3lib_9cbedgraph_1array_to_bedgraph(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_4taco_3lib_9cbedgraph_1array_to_bedgraph = {"array_to_bedgraph", (PyCFunction)__pyx_pw_4taco_3lib_9cbedgraph_1array_to_bedgraph, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_4taco_3lib_9cbedgraph_1array_to_bedgraph(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_a = 0;
   char *__pyx_v_ref;
   int __pyx_v_start;
@@ -1303,21 +1312,21 @@ static PyObject *__pyx_pw_4taco_3lib_9cBedGraph_1array_to_bedgraph(PyObject *__p
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_ref)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("array_to_bedgraph", 1, 4, 4, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("array_to_bedgraph", 1, 4, 4, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_start)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("array_to_bedgraph", 1, 4, 4, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("array_to_bedgraph", 1, 4, 4, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
         case  3:
         if (likely((values[3] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_fileh)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("array_to_bedgraph", 1, 4, 4, 3); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("array_to_bedgraph", 1, 4, 4, 3); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "array_to_bedgraph") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "array_to_bedgraph") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
       goto __pyx_L5_argtuple_error;
@@ -1328,21 +1337,21 @@ static PyObject *__pyx_pw_4taco_3lib_9cBedGraph_1array_to_bedgraph(PyObject *__p
       values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
     }
     __pyx_v_a = ((PyArrayObject *)values[0]);
-    __pyx_v_ref = __Pyx_PyObject_AsString(values[1]); if (unlikely((!__pyx_v_ref) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 36; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_start = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_start == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 36; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_ref = __Pyx_PyObject_AsString(values[1]); if (unlikely((!__pyx_v_ref) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 34; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_start = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_start == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 34; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
     __pyx_v_fileh = ((PyFileObject *)values[3]);
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("array_to_bedgraph", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("array_to_bedgraph", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
-  __Pyx_AddTraceback("taco.lib.cBedGraph.array_to_bedgraph", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("taco.lib.cbedgraph.array_to_bedgraph", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_a), __pyx_ptype_5numpy_ndarray, 1, "a", 0))) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_fileh), __pyx_ptype_4taco_3lib_9cBedGraph_file, 1, "fileh", 0))) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 37; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __pyx_r = __pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(__pyx_self, __pyx_v_a, __pyx_v_ref, __pyx_v_start, __pyx_v_fileh);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_a), __pyx_ptype_5numpy_ndarray, 1, "a", 0))) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_fileh), __pyx_ptype_4taco_3lib_9cbedgraph_file, 1, "fileh", 0))) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_r = __pyx_pf_4taco_3lib_9cbedgraph_array_to_bedgraph(__pyx_self, __pyx_v_a, __pyx_v_ref, __pyx_v_start, __pyx_v_fileh);
 
   /* function exit code */
   goto __pyx_L0;
@@ -1353,7 +1362,7 @@ static PyObject *__pyx_pw_4taco_3lib_9cBedGraph_1array_to_bedgraph(PyObject *__p
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_a, char *__pyx_v_ref, int __pyx_v_start, PyFileObject *__pyx_v_fileh) {
+static PyObject *__pyx_pf_4taco_3lib_9cbedgraph_array_to_bedgraph(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_a, char *__pyx_v_ref, int __pyx_v_start, PyFileObject *__pyx_v_fileh) {
   int __pyx_v_i;
   int __pyx_v_j;
   int __pyx_v_alen;
@@ -1382,11 +1391,11 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
   __pyx_pybuffernd_a.rcbuffer = &__pyx_pybuffer_a;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_a.rcbuffer->pybuffer, (PyObject*)__pyx_v_a, &__Pyx_TypeInfo_nn___pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_a.rcbuffer->pybuffer, (PyObject*)__pyx_v_a, &__Pyx_TypeInfo_nn___pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
   __pyx_pybuffernd_a.diminfo[0].strides = __pyx_pybuffernd_a.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_a.diminfo[0].shape = __pyx_pybuffernd_a.rcbuffer->pybuffer.shape[0];
 
-  /* "taco/lib/cBedGraph.pyx":38
+  /* "taco/lib/cbedgraph.pyx":36
  *                       char * ref, int start,
  *                       file fileh):
  *     assert a.dtype == FLOAT_DTYPE             # <<<<<<<<<<<<<<
@@ -1395,23 +1404,23 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
   #ifndef CYTHON_WITHOUT_ASSERTIONS
   if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_a), __pyx_n_s_dtype); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 38; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_a), __pyx_n_s_dtype); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 36; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_2 = __Pyx_GetModuleGlobalName(__pyx_n_s_FLOAT_DTYPE); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 38; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_2 = __Pyx_GetModuleGlobalName(__pyx_n_s_FLOAT_DTYPE); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 36; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 38; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 36; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 38; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 36; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     if (unlikely(!__pyx_t_4)) {
       PyErr_SetNone(PyExc_AssertionError);
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 38; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 36; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
   }
   #endif
 
-  /* "taco/lib/cBedGraph.pyx":42
+  /* "taco/lib/cbedgraph.pyx":40
  *     cdef int i, j, alen
  *     cdef FLOAT_DTYPE_t val, newval
  *     cdef FILE *fp = PyFile_AsFile(fileh)             # <<<<<<<<<<<<<<
@@ -1420,7 +1429,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
   __pyx_v_fp = PyFile_AsFile(((PyObject *)__pyx_v_fileh));
 
-  /* "taco/lib/cBedGraph.pyx":44
+  /* "taco/lib/cbedgraph.pyx":42
  *     cdef FILE *fp = PyFile_AsFile(fileh)
  * 
  *     alen = a.shape[0]             # <<<<<<<<<<<<<<
@@ -1429,7 +1438,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
   __pyx_v_alen = (__pyx_v_a->dimensions[0]);
 
-  /* "taco/lib/cBedGraph.pyx":45
+  /* "taco/lib/cbedgraph.pyx":43
  * 
  *     alen = a.shape[0]
  *     if alen == 0:             # <<<<<<<<<<<<<<
@@ -1439,7 +1448,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
   __pyx_t_4 = ((__pyx_v_alen == 0) != 0);
   if (__pyx_t_4) {
 
-    /* "taco/lib/cBedGraph.pyx":46
+    /* "taco/lib/cbedgraph.pyx":44
  *     alen = a.shape[0]
  *     if alen == 0:
  *         return             # <<<<<<<<<<<<<<
@@ -1450,7 +1459,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "taco/lib/cBedGraph.pyx":45
+    /* "taco/lib/cbedgraph.pyx":43
  * 
  *     alen = a.shape[0]
  *     if alen == 0:             # <<<<<<<<<<<<<<
@@ -1459,7 +1468,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
   }
 
-  /* "taco/lib/cBedGraph.pyx":48
+  /* "taco/lib/cbedgraph.pyx":46
  *         return
  * 
  *     i = 0             # <<<<<<<<<<<<<<
@@ -1468,7 +1477,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
   __pyx_v_i = 0;
 
-  /* "taco/lib/cBedGraph.pyx":49
+  /* "taco/lib/cbedgraph.pyx":47
  * 
  *     i = 0
  *     val = a[i]             # <<<<<<<<<<<<<<
@@ -1479,7 +1488,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
   if (__pyx_t_5 < 0) __pyx_t_5 += __pyx_pybuffernd_a.diminfo[0].shape;
   __pyx_v_val = (*__Pyx_BufPtrStrided1d(__pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t *, __pyx_pybuffernd_a.rcbuffer->pybuffer.buf, __pyx_t_5, __pyx_pybuffernd_a.diminfo[0].strides));
 
-  /* "taco/lib/cBedGraph.pyx":50
+  /* "taco/lib/cbedgraph.pyx":48
  *     i = 0
  *     val = a[i]
  *     for j in xrange(1, alen):             # <<<<<<<<<<<<<<
@@ -1490,7 +1499,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
   for (__pyx_t_7 = 1; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
     __pyx_v_j = __pyx_t_7;
 
-    /* "taco/lib/cBedGraph.pyx":51
+    /* "taco/lib/cbedgraph.pyx":49
  *     val = a[i]
  *     for j in xrange(1, alen):
  *         newval = a[j]             # <<<<<<<<<<<<<<
@@ -1501,7 +1510,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
     if (__pyx_t_8 < 0) __pyx_t_8 += __pyx_pybuffernd_a.diminfo[0].shape;
     __pyx_v_newval = (*__Pyx_BufPtrStrided1d(__pyx_t_4taco_3lib_6dtypes_FLOAT_DTYPE_t *, __pyx_pybuffernd_a.rcbuffer->pybuffer.buf, __pyx_t_8, __pyx_pybuffernd_a.diminfo[0].strides));
 
-    /* "taco/lib/cBedGraph.pyx":52
+    /* "taco/lib/cbedgraph.pyx":50
  *     for j in xrange(1, alen):
  *         newval = a[j]
  *         if val != newval:             # <<<<<<<<<<<<<<
@@ -1511,7 +1520,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
     __pyx_t_4 = ((__pyx_v_val != __pyx_v_newval) != 0);
     if (__pyx_t_4) {
 
-      /* "taco/lib/cBedGraph.pyx":53
+      /* "taco/lib/cbedgraph.pyx":51
  *         newval = a[j]
  *         if val != newval:
  *             if val != 0:             # <<<<<<<<<<<<<<
@@ -1521,7 +1530,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
       __pyx_t_4 = ((__pyx_v_val != 0.0) != 0);
       if (__pyx_t_4) {
 
-        /* "taco/lib/cBedGraph.pyx":54
+        /* "taco/lib/cbedgraph.pyx":52
  *         if val != newval:
  *             if val != 0:
  *                 fprintf(fp, C_FMT_STRING, ref, start + i, start + j, val)             # <<<<<<<<<<<<<<
@@ -1530,7 +1539,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
         fprintf(__pyx_v_fp, __pyx_k_s_d_d_f, __pyx_v_ref, (__pyx_v_start + __pyx_v_i), (__pyx_v_start + __pyx_v_j), __pyx_v_val);
 
-        /* "taco/lib/cBedGraph.pyx":53
+        /* "taco/lib/cbedgraph.pyx":51
  *         newval = a[j]
  *         if val != newval:
  *             if val != 0:             # <<<<<<<<<<<<<<
@@ -1539,7 +1548,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
       }
 
-      /* "taco/lib/cBedGraph.pyx":55
+      /* "taco/lib/cbedgraph.pyx":53
  *             if val != 0:
  *                 fprintf(fp, C_FMT_STRING, ref, start + i, start + j, val)
  *             i = j             # <<<<<<<<<<<<<<
@@ -1548,7 +1557,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
       __pyx_v_i = __pyx_v_j;
 
-      /* "taco/lib/cBedGraph.pyx":56
+      /* "taco/lib/cbedgraph.pyx":54
  *                 fprintf(fp, C_FMT_STRING, ref, start + i, start + j, val)
  *             i = j
  *             val = newval             # <<<<<<<<<<<<<<
@@ -1557,7 +1566,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
       __pyx_v_val = __pyx_v_newval;
 
-      /* "taco/lib/cBedGraph.pyx":52
+      /* "taco/lib/cbedgraph.pyx":50
  *     for j in xrange(1, alen):
  *         newval = a[j]
  *         if val != newval:             # <<<<<<<<<<<<<<
@@ -1567,7 +1576,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
     }
   }
 
-  /* "taco/lib/cBedGraph.pyx":57
+  /* "taco/lib/cbedgraph.pyx":55
  *             i = j
  *             val = newval
  *     if val != 0:             # <<<<<<<<<<<<<<
@@ -1576,14 +1585,14 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
   __pyx_t_4 = ((__pyx_v_val != 0.0) != 0);
   if (__pyx_t_4) {
 
-    /* "taco/lib/cBedGraph.pyx":58
+    /* "taco/lib/cbedgraph.pyx":56
  *             val = newval
  *     if val != 0:
  *         fprintf(fp, C_FMT_STRING, ref, start + i, start + alen, val)             # <<<<<<<<<<<<<<
  */
     fprintf(__pyx_v_fp, __pyx_k_s_d_d_f, __pyx_v_ref, (__pyx_v_start + __pyx_v_i), (__pyx_v_start + __pyx_v_alen), __pyx_v_val);
 
-    /* "taco/lib/cBedGraph.pyx":57
+    /* "taco/lib/cbedgraph.pyx":55
  *             i = j
  *             val = newval
  *     if val != 0:             # <<<<<<<<<<<<<<
@@ -1591,7 +1600,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
  */
   }
 
-  /* "taco/lib/cBedGraph.pyx":35
+  /* "taco/lib/cbedgraph.pyx":33
  * 
  * @cython.boundscheck(False)
  * def array_to_bedgraph(np.ndarray[FLOAT_DTYPE_t, ndim=1] a,             # <<<<<<<<<<<<<<
@@ -1610,7 +1619,7 @@ static PyObject *__pyx_pf_4taco_3lib_9cBedGraph_array_to_bedgraph(CYTHON_UNUSED 
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_a.rcbuffer->pybuffer);
   __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
-  __Pyx_AddTraceback("taco.lib.cBedGraph.array_to_bedgraph", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("taco.lib.cbedgraph.array_to_bedgraph", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   goto __pyx_L2;
   __pyx_L0:;
@@ -3775,8 +3784,8 @@ static struct PyModuleDef __pyx_moduledef = {
   #else
     PyModuleDef_HEAD_INIT,
   #endif
-    "cBedGraph",
-    0, /* m_doc */
+    "cbedgraph",
+    __pyx_k_TACO_Transcriptome_meta_assembl, /* m_doc */
     -1, /* m_size */
     __pyx_methods /* m_methods */,
     NULL, /* m_reload */
@@ -3815,7 +3824,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_ref, __pyx_k_ref, sizeof(__pyx_k_ref), 0, 0, 1, 1},
   {&__pyx_kp_s_s_d_d_f, __pyx_k_s_d_d_f, sizeof(__pyx_k_s_d_d_f), 0, 0, 1, 0},
   {&__pyx_n_s_start, __pyx_k_start, sizeof(__pyx_k_start), 0, 0, 1, 1},
-  {&__pyx_n_s_taco_lib_cBedGraph, __pyx_k_taco_lib_cBedGraph, sizeof(__pyx_k_taco_lib_cBedGraph), 0, 0, 1, 1},
+  {&__pyx_n_s_taco_lib_cbedgraph, __pyx_k_taco_lib_cbedgraph, sizeof(__pyx_k_taco_lib_cbedgraph), 0, 0, 1, 1},
   {&__pyx_n_s_test, __pyx_k_test, sizeof(__pyx_k_test), 0, 0, 1, 1},
   {&__pyx_kp_u_unknown_dtype_code_in_numpy_pxd, __pyx_k_unknown_dtype_code_in_numpy_pxd, sizeof(__pyx_k_unknown_dtype_code_in_numpy_pxd), 0, 1, 0, 0},
   {&__pyx_n_s_val, __pyx_k_val, sizeof(__pyx_k_val), 0, 0, 1, 1},
@@ -3824,9 +3833,9 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
 };
 static int __Pyx_InitCachedBuiltins(void) {
   #if PY_MAJOR_VERSION >= 3
-  __pyx_builtin_xrange = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_xrange) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 50; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_builtin_xrange = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_xrange) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 48; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   #else
-  __pyx_builtin_xrange = __Pyx_GetBuiltinName(__pyx_n_s_xrange); if (!__pyx_builtin_xrange) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 50; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_builtin_xrange = __Pyx_GetBuiltinName(__pyx_n_s_xrange); if (!__pyx_builtin_xrange) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 48; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   #endif
   __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) {__pyx_filename = __pyx_f[1]; __pyx_lineno = 218; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) {__pyx_filename = __pyx_f[1]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
@@ -3906,17 +3915,17 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__6);
   __Pyx_GIVEREF(__pyx_tuple__6);
 
-  /* "taco/lib/cBedGraph.pyx":35
+  /* "taco/lib/cbedgraph.pyx":33
  * 
  * @cython.boundscheck(False)
  * def array_to_bedgraph(np.ndarray[FLOAT_DTYPE_t, ndim=1] a,             # <<<<<<<<<<<<<<
  *                       char * ref, int start,
  *                       file fileh):
  */
-  __pyx_tuple__7 = PyTuple_Pack(10, __pyx_n_s_a, __pyx_n_s_ref, __pyx_n_s_start, __pyx_n_s_fileh, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_alen, __pyx_n_s_val, __pyx_n_s_newval, __pyx_n_s_fp); if (unlikely(!__pyx_tuple__7)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__7 = PyTuple_Pack(10, __pyx_n_s_a, __pyx_n_s_ref, __pyx_n_s_start, __pyx_n_s_fileh, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_alen, __pyx_n_s_val, __pyx_n_s_newval, __pyx_n_s_fp); if (unlikely(!__pyx_tuple__7)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__7);
   __Pyx_GIVEREF(__pyx_tuple__7);
-  __pyx_codeobj__8 = (PyObject*)__Pyx_PyCode_New(4, 0, 10, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__7, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_mkiyer_git_taco_taco_lib, __pyx_n_s_array_to_bedgraph, 35, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__8)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__8 = (PyObject*)__Pyx_PyCode_New(4, 0, 10, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__7, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_mkiyer_git_taco_taco_lib, __pyx_n_s_array_to_bedgraph, 33, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__8)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -3932,11 +3941,11 @@ static int __Pyx_InitGlobals(void) {
 }
 
 #if PY_MAJOR_VERSION < 3
-PyMODINIT_FUNC initcBedGraph(void); /*proto*/
-PyMODINIT_FUNC initcBedGraph(void)
+PyMODINIT_FUNC initcbedgraph(void); /*proto*/
+PyMODINIT_FUNC initcbedgraph(void)
 #else
-PyMODINIT_FUNC PyInit_cBedGraph(void); /*proto*/
-PyMODINIT_FUNC PyInit_cBedGraph(void)
+PyMODINIT_FUNC PyInit_cbedgraph(void); /*proto*/
+PyMODINIT_FUNC PyInit_cbedgraph(void)
 #endif
 {
   PyObject *__pyx_t_1 = NULL;
@@ -3954,7 +3963,7 @@ PyMODINIT_FUNC PyInit_cBedGraph(void)
           Py_FatalError("failed to import 'refnanny' module");
   }
   #endif
-  __Pyx_RefNannySetupContext("PyMODINIT_FUNC PyInit_cBedGraph(void)", 0);
+  __Pyx_RefNannySetupContext("PyMODINIT_FUNC PyInit_cbedgraph(void)", 0);
   if (__Pyx_check_binary_version() < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_empty_tuple = PyTuple_New(0); if (unlikely(!__pyx_empty_tuple)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_empty_bytes = PyBytes_FromStringAndSize("", 0); if (unlikely(!__pyx_empty_bytes)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
@@ -3982,7 +3991,7 @@ PyMODINIT_FUNC PyInit_cBedGraph(void)
   #endif
   /*--- Module creation code ---*/
   #if PY_MAJOR_VERSION < 3
-  __pyx_m = Py_InitModule4("cBedGraph", __pyx_methods, 0, 0, PYTHON_API_VERSION); Py_XINCREF(__pyx_m);
+  __pyx_m = Py_InitModule4("cbedgraph", __pyx_methods, __pyx_k_TACO_Transcriptome_meta_assembl, 0, PYTHON_API_VERSION); Py_XINCREF(__pyx_m);
   #else
   __pyx_m = PyModule_Create(&__pyx_moduledef);
   #endif
@@ -3999,14 +4008,14 @@ PyMODINIT_FUNC PyInit_cBedGraph(void)
   #if PY_MAJOR_VERSION < 3 && (__PYX_DEFAULT_STRING_ENCODING_IS_ASCII || __PYX_DEFAULT_STRING_ENCODING_IS_DEFAULT)
   if (__Pyx_init_sys_getdefaultencoding_params() < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   #endif
-  if (__pyx_module_is_main_taco__lib__cBedGraph) {
+  if (__pyx_module_is_main_taco__lib__cbedgraph) {
     if (PyObject_SetAttrString(__pyx_m, "__name__", __pyx_n_s_main) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
   #if PY_MAJOR_VERSION >= 3
   {
     PyObject *modules = PyImport_GetModuleDict(); if (unlikely(!modules)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-    if (!PyDict_GetItemString(modules, "taco.lib.cBedGraph")) {
-      if (unlikely(PyDict_SetItemString(modules, "taco.lib.cBedGraph", __pyx_m) < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    if (!PyDict_GetItemString(modules, "taco.lib.cbedgraph")) {
+      if (unlikely(PyDict_SetItemString(modules, "taco.lib.cbedgraph", __pyx_m) < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
   }
   #endif
@@ -4018,7 +4027,7 @@ PyMODINIT_FUNC PyInit_cBedGraph(void)
   /*--- Variable export code ---*/
   /*--- Function export code ---*/
   /*--- Type init code ---*/
-  __pyx_ptype_4taco_3lib_9cBedGraph_file = __Pyx_ImportType(__Pyx_BUILTIN_MODULE_NAME, "file", sizeof(PyFileObject), 0); if (unlikely(!__pyx_ptype_4taco_3lib_9cBedGraph_file)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 21; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_ptype_4taco_3lib_9cbedgraph_file = __Pyx_ImportType(__Pyx_BUILTIN_MODULE_NAME, "file", sizeof(PyFileObject), 0); if (unlikely(!__pyx_ptype_4taco_3lib_9cbedgraph_file)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 20; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   /*--- Type import code ---*/
   __pyx_ptype_7cpython_4type_type = __Pyx_ImportType(__Pyx_BUILTIN_MODULE_NAME, "type", 
   #if CYTHON_COMPILING_IN_PYPY
@@ -4039,62 +4048,64 @@ PyMODINIT_FUNC PyInit_cBedGraph(void)
   if (__Pyx_patch_abc() < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   #endif
 
-  /* "taco/lib/cBedGraph.pyx":1
+  /* "taco/lib/cbedgraph.pyx":4
+ * TACO: Transcriptome meta-assembly from RNA-Seq
+ * '''
  * import numpy as np             # <<<<<<<<<<<<<<
  * cimport numpy as np
  * cimport cython
  */
-  __pyx_t_1 = __Pyx_Import(__pyx_n_s_numpy, 0, -1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_Import(__pyx_n_s_numpy, 0, -1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 4; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 4; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "taco/lib/cBedGraph.pyx":6
+  /* "taco/lib/cbedgraph.pyx":9
  * 
  * # import array type definitions
  * from dtypes import FLOAT_DTYPE             # <<<<<<<<<<<<<<
  * from dtypes cimport FLOAT_DTYPE_t
  * 
  */
-  __pyx_t_1 = PyList_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 6; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyList_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 9; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_INCREF(__pyx_n_s_FLOAT_DTYPE);
   __Pyx_GIVEREF(__pyx_n_s_FLOAT_DTYPE);
   PyList_SET_ITEM(__pyx_t_1, 0, __pyx_n_s_FLOAT_DTYPE);
-  __pyx_t_2 = __Pyx_Import(__pyx_n_s_dtypes, __pyx_t_1, -1); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 6; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_Import(__pyx_n_s_dtypes, __pyx_t_1, -1); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 9; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_ImportFrom(__pyx_t_2, __pyx_n_s_FLOAT_DTYPE); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 6; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_ImportFrom(__pyx_t_2, __pyx_n_s_FLOAT_DTYPE); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 9; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_FLOAT_DTYPE, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 6; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_FLOAT_DTYPE, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 9; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "taco/lib/cBedGraph.pyx":25
+  /* "taco/lib/cbedgraph.pyx":24
  * 
  * # for print statement
  * FMT_STRING = '%s\t%d\t%d\t%f\n'             # <<<<<<<<<<<<<<
  * DEF C_FMT_STRING = "%s\t%d\t%d\t%f\n"
  * 
  */
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_FMT_STRING, __pyx_kp_s_s_d_d_f) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 25; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_FMT_STRING, __pyx_kp_s_s_d_d_f) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 24; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "taco/lib/cBedGraph.pyx":35
+  /* "taco/lib/cbedgraph.pyx":33
  * 
  * @cython.boundscheck(False)
  * def array_to_bedgraph(np.ndarray[FLOAT_DTYPE_t, ndim=1] a,             # <<<<<<<<<<<<<<
  *                       char * ref, int start,
  *                       file fileh):
  */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_4taco_3lib_9cBedGraph_1array_to_bedgraph, NULL, __pyx_n_s_taco_lib_cBedGraph); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_4taco_3lib_9cbedgraph_1array_to_bedgraph, NULL, __pyx_n_s_taco_lib_cbedgraph); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_array_to_bedgraph, __pyx_t_2) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 35; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_array_to_bedgraph, __pyx_t_2) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 33; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "taco/lib/cBedGraph.pyx":1
- * import numpy as np             # <<<<<<<<<<<<<<
- * cimport numpy as np
- * cimport cython
+  /* "taco/lib/cbedgraph.pyx":1
+ * '''             # <<<<<<<<<<<<<<
+ * TACO: Transcriptome meta-assembly from RNA-Seq
+ * '''
  */
   __pyx_t_2 = PyDict_New(); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 1; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
@@ -4117,11 +4128,11 @@ PyMODINIT_FUNC PyInit_cBedGraph(void)
   __Pyx_XDECREF(__pyx_t_2);
   if (__pyx_m) {
     if (__pyx_d) {
-      __Pyx_AddTraceback("init taco.lib.cBedGraph", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      __Pyx_AddTraceback("init taco.lib.cbedgraph", __pyx_clineno, __pyx_lineno, __pyx_filename);
     }
     Py_DECREF(__pyx_m); __pyx_m = 0;
   } else if (!PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ImportError, "init taco.lib.cBedGraph");
+    PyErr_SetString(PyExc_ImportError, "init taco.lib.cbedgraph");
   }
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();

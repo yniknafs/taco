@@ -43,8 +43,7 @@ def test_unreachable_kmers():
     assert K.graph['num_lost_kmers'] == 0
     assert len(K) == 8
 
-    K, k = create_optimal_path_graph(sgraph, frag_length=0, kmax=0,
-                                     loss_threshold=1.0)
+    K, k = create_optimal_path_graph(sgraph, kmax=0, loss_threshold=1.0)
     assert k == 1
     assert len(K) == 8
 
