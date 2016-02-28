@@ -50,3 +50,4 @@ def maximize_bisect(f, xmin, xmax, max_iterations=0):
         else:
             xmin = x
             x = xlist[2]
+    return None, 0

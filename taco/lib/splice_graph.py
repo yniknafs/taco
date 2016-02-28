@@ -5,6 +5,7 @@ import logging
 import collections
 import bisect
 from itertools import chain
+from array import array
 import networkx as nx
 import numpy as np
 
@@ -14,6 +15,7 @@ from dtypes import FLOAT_DTYPE
 from cchangepoint import find_threshold_points
 from changepoint import run_changepoint
 from bx.intersection import Interval, IntervalTree
+import cbisect
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -63,12 +65,17 @@ def _array_subset(a, start, end):
 
 def split_transfrag(t, boundaries):
     '''
+    exons must be sorted in increasing order
+
     output: (generator) tuples (a,b) reflecting nodes
     '''
+    end_ind = 0
     for exon in t.exons:
         # find the indexes into the splice sites list that border the exon.
-        start_ind = bisect.bisect_right(boundaries, exon.start)
-        end_ind = bisect.bisect_left(boundaries, exon.end)
+        start_ind = cbisect.bisect_right(boundaries, exon.start, lo=end_ind)
+        end_ind = cbisect.bisect_left(boundaries, exon.end, lo=start_ind)
+        # start_ind = bisect.bisect_right(boundaries, exon.start)
+        # end_ind = bisect.bisect_left(boundaries, exon.end)
         if start_ind == end_ind:
             yield boundaries[start_ind-1], boundaries[start_ind]
         else:
@@ -180,7 +187,7 @@ class SpliceGraph(object):
                     node_bounds.update((t.start, t.end))
                 if self.guided_assembly:
                     node_bounds.update(t.itersplices())
-        return sorted(node_bounds)
+        return array('i', sorted(node_bounds))
 
     def get_path(self, t):
         node_id_map = self.G.graph['node_id_map']
@@ -195,7 +202,7 @@ class SpliceGraph(object):
         node_bounds = self.node_bounds
         node_id_map = {}
         id_node_map = {}
-        current_id = 1
+        current_id = 2
         for t in self.itertransfrags():
             # split exons that cross boundaries and get the
             # nodes that made up the transfrag

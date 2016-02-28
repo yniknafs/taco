@@ -9,10 +9,8 @@ from gtf import GTF
 from base import Strand
 from transfrag import Transfrag
 from locus import Locus
-from path_graph import KMER_EXPR, smooth_graph, reconstruct_path, \
-    create_optimal_path_graph, get_lost_nodes
 from cpathfinder import find_paths
-
+from path_graph import PathGraphFactory, reconstruct_path
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
@@ -240,55 +238,24 @@ def assign_ids(isoforms, strand, gene_id_value_obj, tss_id_value_obj):
 
 
 def assemble_isoforms(sgraph, config):
-    # create a path graph from the splice graph
-    K, k = create_optimal_path_graph(
-        sgraph,
-        kmax=config.path_graph_kmax,
-        loss_threshold=config.path_graph_loss_threshold,
-        stats_fh=config.path_graph_stats_fh)
-    if K is None:
+    # read in transfrag paths
+    pgf = PathGraphFactory(sgraph)
+    K, k = pgf.create_optimal(kmax=config.path_graph_kmax,
+                              loss_threshold=config.path_graph_loss_threshold,
+                              stats_fh=config.path_graph_stats_fh)
+    if K is None or len(K) == 0:
         return []
-    if len(K) == 0:
-        return []
-
-    # report lost nodes
-    if config.assembly_loss_gtf_fh is not None:
-        graph_id = ('L_%s:%d-%d[%s]' %
-                    (sgraph.chrom, sgraph.start, sgraph.end,
-                     Strand.to_gtf(sgraph.strand)))
-        for n_id in get_lost_nodes(sgraph, K):
-            n = sgraph.get_node_interval(n_id)
-            expr_data = sgraph.get_node_expr_data(n_id)
-            # return gtf feature for each node
-            f = GTF.Feature()
-            f.seqid = sgraph.chrom
-            f.source = 'taco'
-            f.feature = 'lost_node'
-            f.start = n[0]
-            f.end = n[1]
-            f.score = 0.0
-            f.strand = Strand.to_gtf(sgraph.strand)
-            f.phase = '.'
-            f.attrs = {'graph_id': graph_id,
-                       'expr': str(expr_data.mean())}
-            print >>config.assembly_loss_gtf_fh, str(f)
-
     # smooth kmer graph
-    smooth_graph(K)
+    K.apply_smoothing()
 
-    source_node = K.graph['source']
-    source_expr = K.node[source_node][KMER_EXPR]
     logging.debug('%s:%d-%d[%s] finding paths in k=%d graph '
-                  '(%d nodes) source_expr=%f' %
+                  '(%d kmers) source_expr=%f' %
                   (sgraph.chrom, sgraph.start, sgraph.end,
                    Strand.to_gtf(sgraph.strand), k, len(K),
-                   source_expr))
-    id_kmer_map = K.graph['id_kmer_map']
-
+                   K.exprs[K.SOURCE_ID]))
     paths = []
-    for kmer_path, expr in find_paths(K, KMER_EXPR, config.path_frac,
-                                      config.max_paths):
-        path = reconstruct_path(kmer_path, id_kmer_map, sgraph)
+    for kmer_path, expr in find_paths(K, config.path_frac, config.max_paths):
+        path = reconstruct_path(kmer_path, K, sgraph)
         logging.debug("\texpr=%f length=%d" % (expr, len(path)))
         paths.append((path, expr))
     # build gene clusters
@@ -448,7 +415,7 @@ def assemble(**kwargs):
     config.splice_graph_gtf_fh = open(config.splice_graph_gtf_file, 'w')
     # path graph stats file
     config.path_graph_stats_fh = open(config.path_graph_stats_file, 'w')
-    fields = ['locus', 'k', 'kmax', 'transfrags', 'nodes', 'kmers',
+    fields = ['locus', 'k', 'kmax', 'transfrags', 'kmers',
               'short_transfrags', 'lost_kmers', 'tot_expr', 'lost_expr',
               'lost_expr_frac', 'valid']
     print >>config.path_graph_stats_fh, '\t'.join(fields)

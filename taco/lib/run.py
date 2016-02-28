@@ -388,7 +388,7 @@ class Run(object):
         else:
             level = logging.INFO
         logging.basicConfig(level=level,
-                            format="%(asctime)s - %(levelname)s - %(message)s")
+                            format="%(levelname)s - %(message)s")
 
         # create output directories
         results = self.results

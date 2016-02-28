@@ -3,6 +3,7 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 '''
 import pytest
 import numpy as np
+from array import array
 
 from taco.lib.base import TacoError, Strand, Exon
 from taco.lib.dtypes import FLOAT_DTYPE
@@ -186,7 +187,7 @@ def test_split_transfrag():
     interval, gtf_lines = loci[0]
     t_dict = Transfrag.parse_gtf(gtf_lines)
     sg = SpliceGraph.create(t_dict.values())
-    boundaries = tuple(sg._find_node_boundaries())
+    boundaries = array('i', sg._find_node_boundaries())
     # check nodes
     t = t_dict['A']
     nodes = tuple(split_transfrag(t, boundaries))

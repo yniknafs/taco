@@ -5,6 +5,8 @@ cimport cpython.array
 # local imports
 from sais cimport sais_int, sais_int_bwt
 
+DEF TERMINATOR = 0
+DEF SPACER = 1
 
 cdef int suffix_cmp(tuple p, int[:] t, int[:] sa, int c):
     cdef int i = 0
@@ -55,24 +57,32 @@ cdef class SuffixArrayIndex(object):
     cdef list lengths
     cdef int alphabet_size
 
-    def __init__(self, seqs, alphabet_size=0):
+    def __init__(self, seqs):
+        cdef object seq
+        cdef list t, starts, lengths
+        cdef int i, alphabet_size
+
         t = []
         starts = []
         lengths = []
         i = 0
+        alphabet_size = 0
         for seq in seqs:
             t.extend(seq)
+            t.append(SPACER)
             starts.append(i)
             lengths.append(len(seq))
-            i += len(seq)
-        t.append(0)
+            i += len(seq) + 1
+        t.append(TERMINATOR)
+
+        self.alphabet_size = max(t) + 1
         self.starts = starts
         self.lengths = lengths
         self.t = array('i', t)
         self.sa = array('i', t)
         if alphabet_size == 0:
-            alphabet_size = len(set(t))
-        self.alphabet_size = max(alphabet_size, 256)
+            alphabet_size = max(t) + 1
+        self.alphabet_size = alphabet_size
         suffix_array(self.t, self.sa, len(t), self.alphabet_size)
 
     def search(self, tuple p):

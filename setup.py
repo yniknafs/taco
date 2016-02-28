@@ -34,7 +34,9 @@ extensions = [
     Extension('taco.lib.csuffixarray',
               sources=['taco/lib/csuffixarray.pyx', 'taco/lib/sais.c']),
     Extension('taco.lib.cpathfinder',
-              sources=['taco/lib/cpathfinder.pyx'])
+              sources=['taco/lib/cpathfinder.pyx']),
+    Extension('taco.lib.cbisect',
+              sources=['taco/lib/cbisect.pyx', 'taco/lib/bsearch.c'])
 ]
 
 
