@@ -12,7 +12,7 @@ __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -42,7 +42,7 @@ extensions = [
 
 def main():
     setup(name='taco',
-          version='0.4.0',
+          version=__version__,
           description='transcriptome meta-assembly from rna-seq',
           author='Matthew Iyer and Yashar Niknafs',
           author_email='yniknafs@umich.edu',
