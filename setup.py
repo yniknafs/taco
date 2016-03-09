@@ -18,7 +18,7 @@ __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
 
-extensions = [
+cython_extensions = [
     Extension('taco.lib.cbedgraph',
               sources=['taco/lib/cbedgraph.pyx'],
               include_dirs=[numpy_inc]),
@@ -36,7 +36,14 @@ extensions = [
     Extension('taco.lib.cpathfinder',
               sources=['taco/lib/cpathfinder.pyx']),
     Extension('taco.lib.cbisect',
-              sources=['taco/lib/cbisect.pyx', 'taco/lib/bsearch.c'])
+              sources=['taco/lib/cbisect.pyx', 'taco/lib/bsearch.c']),
+    Extension('taco.lib.scipy.norm_sf',
+              sources=['taco/lib/scipy/norm_sf.pyx', 'taco/lib/scipy/ndtr.c'],
+              include_dirs=[numpy_inc, 'taco/lib/scipy'])
+]
+
+extensions = [
+    Extension('taco.lib.caggregate', sources = ['taco/lib/caggregate.c'])
 ]
 
 
@@ -44,15 +51,16 @@ def main():
     setup(name='taco',
           version=__version__,
           description='transcriptome meta-assembly from rna-seq',
-          author='Matthew Iyer and Yashar Niknafs',
+          author='Matthew Iyer, Yashar Niknafs, Balaji Pandian',
           author_email='yniknafs@umich.edu',
           requires=['numpy', 'scipy', 'networkx', 'h5py', 'pysam'],
           license='GPL',
           platforms='Linux',
           url='https://github.com/yniknafs/taco',
-          ext_modules=cythonize(extensions),
-          packages=['taco'],
+          ext_modules=extensions + cythonize(cython_extensions),
+          packages=['taco', 'taco.lib', 'taco.lib.bx'],
           scripts=['taco/taco_run.py'])
+
 
 if __name__ == '__main__':
     main()

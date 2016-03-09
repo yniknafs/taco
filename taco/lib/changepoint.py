@@ -4,8 +4,8 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 from collections import namedtuple
 
 import numpy as np
-from scipy.stats import mannwhitneyu
 
+from taco.lib.stats import mannwhitneyu
 from taco.lib.cchangepoint import mse as mse_cython
 
 
@@ -212,10 +212,6 @@ def smooth(x, window_len=11, window='hanning'):
     t=linspace(-2,2,0.1)
     x=sin(t)+randn(len(t))*0.1
     y=smooth(x)
-
-    see also:
-    numpy.hanning, numpy.hamming, numpy.bartlett, numpy.blackman,
-    numpy.convolve, scipy.signal.lfilter
 
     TODO: the window parameter could be the window itself if an array instead
           of a string
