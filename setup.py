@@ -53,7 +53,7 @@ def main():
           description='transcriptome meta-assembly from rna-seq',
           author='Matthew Iyer, Yashar Niknafs, Balaji Pandian',
           author_email='yniknafs@umich.edu',
-          requires=['numpy', 'scipy', 'networkx', 'h5py', 'pysam'],
+          requires=['numpy', 'networkx', 'h5py'],
           license='GPL',
           platforms='Linux',
           url='https://github.com/yniknafs/taco',

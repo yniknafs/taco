@@ -5,7 +5,6 @@ Copyright (C) 2012-2015 Matthew Iyer
 import os
 import logging
 import collections
-import pysam
 
 from base import Sample, TacoError
 from gtf import GTF, GTFError, sort_gtf
