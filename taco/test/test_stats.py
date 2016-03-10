@@ -13,6 +13,6 @@ from taco.lib.stats import mannwhitneyu as mwu
 def test_mannwhitneyu():
     x = [1, 2, 3, 4, 5]
     y = [6, 7, 8, 9, 10]
-
-    print scipy_mwu(x, y)
-    print mwu(x, y)
+    p1 = scipy_mwu(x, y).pvalue
+    p2 = mwu(x, y).pvalue / 2.0
+    assert abs(p1 - p2) < 1e-5

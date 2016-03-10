@@ -6,6 +6,7 @@ import collections
 import bisect
 from itertools import chain
 from array import array
+import networkx as nx
 import numpy as np
 
 from base import Exon, Strand, TacoError
@@ -29,14 +30,14 @@ __status__ = "Development"
 
 class SGraph(Graph):
     def __init__(self):
-        super(SGraph, self).__init__()
+        super(MyGraph, self).__init__()
         self.is_start = [True, True]
         self.is_stop = [True, True]
         self.is_ref = [False, False]
 
     def add_node(self, node):
         if node not in self.node_id_map:
-            node_id = super(SGraph, self).add_node(node)
+            node_id = super(MyGraph, self).add_node(node)
             self.is_start.append(False)
             self.is_stop.append(False)
             self.is_ref.append(False)
@@ -45,19 +46,33 @@ class SGraph(Graph):
         return node_id
 
     def add_path(self, path, is_ref):
-        node_ids = super(SGraph, self).add_path(path)
+        node_ids = super(MyGraph, self).add_path(path)
         for node_id in node_ids:
             if is_ref:
                 self.is_ref[node_id] = True
-        return node_ids
 
-    def set_start_stop_nodes(self):
-        # get all leaf nodes
-        for i in self.node_ids_iter():
-            if len(self.preds[i]) == 0:
-                self.is_start[i] = True
-            if len(self.succs[i]) == 0:
-                self.is_stop[i] = True
+
+# graph node attributes
+class SGNode:
+    IS_START = 'is_start'
+    IS_STOP = 'is_stop'
+    IS_REF = 'is_ref'
+    INTERVAL = 'interval'
+
+    @staticmethod
+    def init():
+        return {SGNode.IS_START: False,
+                SGNode.IS_STOP: False,
+                SGNode.IS_REF: False}
+
+    @staticmethod
+    def add(G, n, interval, is_ref=False):
+        if n not in G:
+            d = SGNode.init()
+            d[SGNode.INTERVAL] = interval
+            G.add_node(n, attr_dict=d)
+        if is_ref:
+            G.node[n][SGNode.IS_REF] = True
 
 
 def _array_subset(a, start, end):
@@ -200,57 +215,90 @@ class SpliceGraph(object):
         return array('i', sorted(node_bounds))
 
     def get_path(self, t):
-        node_id_map = self.G.node_id_map
+        node_id_map = self.G.graph['node_id_map']
         nodes = [node_id_map[n] for n in split_transfrag(t, self.node_bounds)]
         if self.strand == Strand.NEG:
             nodes.reverse()
         return tuple(nodes)
 
-    def _create_splice_graph(self):
+    def _create_splice_graph2(self):
         G = SGraph()
-        for t in self.itertransfrags():
-            nodes = [Exon(*n) for n in split_transfrag(t, self.node_bounds)]
+        for t in sgraph.itertransfrags():
+            nodes = [n for n in split_transfrag(t, self.node_bounds)]
             if self.strand == Strand.NEG:
                 nodes.reverse()
             G.add_path(nodes, t.is_ref)
-        # after graph is built, set node properties for start and stop nodes
-        G.set_start_stop_nodes()
+        return G
+
+    def _create_splice_graph(self):
+        '''returns networkx DiGraph object'''
+        G = nx.DiGraph()
+        node_bounds = self.node_bounds
+        node_id_map = {}
+        id_node_map = {}
+        current_id = 2
+        for t in self.itertransfrags():
+            # split exons that cross boundaries and get the
+            # nodes that made up the transfrag
+            nodes = []
+            for n in split_transfrag(t, node_bounds):
+                n = Exon(*n)
+                if n not in node_id_map:
+                    n_id = current_id
+                    current_id += 1
+                    node_id_map[n] = n_id
+                    id_node_map[n_id] = n
+                else:
+                    n_id = node_id_map[n]
+                nodes.append(n_id)
+            if t.strand == Strand.NEG:
+                nodes.reverse()
+            # add nodes/edges to graph
+            u = nodes[0]
+            SGNode.add(G, u, id_node_map[u], is_ref=t.is_ref)
+            for i in xrange(1, len(nodes)):
+                v = nodes[i]
+                SGNode.add(G, v, id_node_map[v], is_ref=t.is_ref)
+                G.add_edge(u, v)
+                u = v
+        G.graph['node_id_map'] = node_id_map
+        G.graph['id_node_map'] = id_node_map
         return G
 
     def _mark_start_stop_nodes(self):
         G = self.G
+        # get all leaf nodes
+        for n, nd in G.nodes_iter(data=True):
+            if G.in_degree(n) == 0:
+                nd[SGNode.IS_START] = True
+            if G.out_degree(n) == 0:
+                nd[SGNode.IS_STOP] = True
+        # mark change points
+        change_points = set()
+        change_points.update(set((SGNode.IS_START, x) for x in self.start_sites))
+        change_points.update(set((SGNode.IS_STOP, x) for x in self.stop_sites))
+        if self.guided_ends:
+            change_points.update((SGNode.IS_START, x)
+                                 for x in self.ref_start_sites)
+            change_points.update((SGNode.IS_STOP, x)
+                                 for x in self.ref_stop_sites)
         node_bounds = self.node_bounds
         strand = self.strand
-
-        # mark start nodes
-        changepts = set(self.start_sites)
-        if self.guided_ends:
-            changepts.update(self.ref_start_sites)
-        for pos in changepts:
-            if strand != Strand.NEG:
+        node_id_map = G.graph['node_id_map']
+        for direction, pos in change_points:
+            if ((direction == SGNode.IS_STOP and strand == Strand.NEG) or
+                (direction == SGNode.IS_START and strand != Strand.NEG)):
                 bisect_func = bisect.bisect_right
             else:
                 bisect_func = bisect.bisect_left
             i = bisect_func(node_bounds, pos)
             n = (node_bounds[i-1], node_bounds[i])
-            if G.has_node(n):
-                n_id = G.get_node_id(n)
-                G.is_start[n_id] = True
-
-        # mark stop nodes
-        changepts = set(self.stop_sites)
-        if self.guided_ends:
-            changepts.update(self.ref_stop_sites)
-        for pos in changepts:
-            if strand == Strand.NEG:
-                bisect_func = bisect.bisect_right
-            else:
-                bisect_func = bisect.bisect_left
-            i = bisect_func(node_bounds, pos)
-            n = (node_bounds[i-1], node_bounds[i])
-            if G.has_node(n):
-                n_id = G.get_node_id(n)
-                G.is_stop[n_id] = True
+            if n in node_id_map:
+                # 2/5/2016: observed case where trimming caused an interval
+                # with zero expression, and this function then crashed when
+                # attempting to mark the node as a start/stop. We no longer
+                # attempt to mark nodes in zero expression regions.
+                G.node[node_id_map[n]][direction] = True
 
     def _add_to_interval_trees(self, t):
         istart = Interval(t.start, t.start+1, value=t)
@@ -291,8 +339,9 @@ class SpliceGraph(object):
         returns list of ChangePoint tuples
         '''
         changepts = []
-        for n in self.G.nodes_iter():
-            expr_data = self.get_expr_data(*n)
+        for n_id in self.G:
+            n = self.get_node_interval(n_id)
+            expr_data = self.get_expr_data(n.start, n.end)
             for cp in run_changepoint(expr_data, *args, **kwargs):
                 # add offset from start of node to change point positions
                 cp = cp._replace(pos=n.start + cp.pos,
@@ -312,7 +361,7 @@ class SpliceGraph(object):
         trim: if true, will trim transfrags around change points
         '''
         if ((self.strand != Strand.NEG and cp.sign < 0) or
-            (self.strand == Strand.NEG and cp.sign > 0)):
+                (self.strand == Strand.NEG and cp.sign > 0)):
             self.stop_sites.add(cp.pos)
         else:
             self.start_sites.add(cp.pos)
@@ -358,32 +407,37 @@ class SpliceGraph(object):
         '''splits into weakly connected component subgraphs'''
         # get connected components of graph which represent independent genes
         # unconnected components are considered different genes
-        num_components, components = self.G.weakly_connected_components()
-        if num_components == 1:
+        Gsubs = list(nx.weakly_connected_component_subgraphs(self.G))
+        if len(Gsubs) == 1:
             yield self
             return
-        # map transfrags to components
-        component_transfrag_map = collections.defaultdict(list)
+        # map nodes to components
+        node_subgraph_map = {}
+        subgraph_transfrag_map = collections.defaultdict(list)
+        for i, Gsub in enumerate(Gsubs):
+            for n_id in Gsub:
+                n = self.get_node_interval(n_id)
+                node_subgraph_map[n] = i
         # assign transfrags to components
         for t in self.itertransfrags():
             for n in split_transfrag(t, self.node_bounds):
-                component_id = components[self.G.get_node_id(n)]
-                component_transfrag_map[component_id].append(t)
+                subgraph_id = node_subgraph_map[n]
+                subgraph_transfrag_map[subgraph_id].append(t)
                 break
         # create new graphs using the separate components
-        for component_transfrags in component_transfrag_map.itervalues():
-            yield SpliceGraph.create(component_transfrags,
+        for subgraph_transfrags in subgraph_transfrag_map.itervalues():
+            yield SpliceGraph.create(subgraph_transfrags,
                                      guided_ends=self.guided_ends,
                                      guided_assembly=self.guided_assembly)
 
     def get_node_interval(self, n_id):
-        return self.G.get_node(n_id)
+        return self.G.node[n_id][SGNode.INTERVAL]
 
     def get_node_id(self, n):
-        return self.G.get_node_id(n)
+        return self.G.graph['node_id_map'][n]
 
     def get_node_expr_data(self, n_id):
-        start, end = self.G.get_node(n_id)
+        start, end = self.get_node_interval(n_id)
         return self.get_expr_data(start, end)
 
     def itertransfrags(self):
@@ -395,11 +449,11 @@ class SpliceGraph(object):
     def get_start_stop_nodes(self):
         start_nodes = set()
         stop_nodes = set()
-        for i in self.G.node_ids_iter():
-            if self.G.is_start[i]:
-                start_nodes.add(i)
-            if self.G.is_stop[i]:
-                stop_nodes.add(i)
+        for n, nd in self.G.nodes_iter(data=True):
+            if nd[SGNode.IS_START]:
+                start_nodes.add(n)
+            if nd[SGNode.IS_STOP]:
+                stop_nodes.add(n)
         return start_nodes, stop_nodes
 
     def get_expr_data(self, start=None, end=None):
@@ -420,7 +474,7 @@ class SpliceGraph(object):
                     (self.chrom, self.start, self.end,
                      Strand.to_gtf(self.strand)))
         # iterate through locus and return change point data
-        for n_id in self.G.node_ids_iter():
+        for n_id in self.G:
             n = self.get_node_interval(n_id)
             expr_data = self.get_expr_data(*n)
             ref_starts = _array_subset(self.ref_start_sites, *n)

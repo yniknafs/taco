@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from taco.lib.base import Strand, Exon
 from taco.lib.dtypes import FLOAT_DTYPE
-from taco.lib.splice_graph import SpliceGraph, SGNode
+from taco.lib.splice_graph import SpliceGraph
 from taco.lib.cchangepoint import mse as mse_cython
 from taco.lib.changepoint import mse as mse_python, smooth, run_changepoint
 from taco.lib.assemble import assemble_isoforms, Config
@@ -154,7 +154,7 @@ def test_trimming_to_zero_bug():
     t_dict, locus = read_single_locus('change_point_bug.gtf')
     transfrags_un = locus.get_transfrags(Strand.NA)
     sgraph = SpliceGraph.create(transfrags_un)
-    cps = sgraph.detect_change_points()
+    cps = sgraph.detect_change_points(pval=0.1)
     for cp in cps:
         sgraph.apply_change_point(cp)
     sgraph.recreate()
@@ -182,11 +182,11 @@ def test_ccle55_cuff_noc2l():
 
     # examine specific change points
     trim = False
-    pval = 0.05
+    pval = 0.1
     fc_cutoff = 0.8
     n1 = Exon(934942, 944589)
     n1_id = sgraph.get_node_id(n1)
-    assert sgraph.G.node[n1_id][SGNode.IS_STOP]
+    assert sgraph.G.is_stop[n1_id]
     cps = sgraph.detect_change_points(pval=pval, fc_cutoff=fc_cutoff)
     for cp in cps:
         sgraph.apply_change_point(cp, trim=trim)

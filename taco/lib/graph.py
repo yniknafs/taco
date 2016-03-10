@@ -33,6 +33,24 @@ def single_node_shortest_path_length(node, nbrs):
     return seen  # return all path lengths as dictionary
 
 
+def _plain_bfs(succs, preds, source):
+    """
+    Adapted from Networkx 1.10
+    A fast BFS node generator
+    """
+    seen = set()
+    nextlevel = {source}
+    while nextlevel:
+        thislevel = nextlevel
+        nextlevel = set()
+        for v in thislevel:
+            if v not in seen:
+                yield v
+                seen.add(v)
+                nextlevel.update(succs[v])
+                nextlevel.update(preds[v])
+
+
 class Graph(object):
     SOURCE = -1
     SINK = -2
@@ -51,6 +69,19 @@ class Graph(object):
 
     def __len__(self):
         return self.n
+
+    def __contains__(self, item):
+        return item in self.node_id_map
+
+    def nodes_iter(self, source=False, sink=False):
+        if source:
+            yield Graph.SOURCE
+        if sink:
+            yield Graph.SINK
+        for i in xrange(Graph.FIRST_ID, len(self.nodes)):
+            if self.nodes[i] == Graph.EMPTY:
+                continue
+            yield self.nodes[i]
 
     def node_ids_iter(self, source=False, sink=False):
         if source:
@@ -72,7 +103,10 @@ class Graph(object):
     def has_node(self, node):
         return node in self.node_id_map
 
-    def get_node(self, node):
+    def get_node(self, node_id):
+        return self.nodes[node_id]
+
+    def get_node_id(self, node):
         return self.node_id_map[node]
 
     def add_node(self, node):
@@ -252,3 +286,21 @@ class Graph(object):
             if ui > vi:
                 return False
         return True
+
+    def weakly_connected_components(self):
+        """
+        Adapted from NetworkX 1.10 (networkx.algorithms.components)
+        Creates a list that maps each node to the index of a weakly
+        connected component
+        """
+        components = [-1] * len(self.nodes)
+        num_components = 0
+        seen = set()
+        for v in self.node_ids_iter():
+            if v not in seen:
+                c = set(_plain_bfs(self.succs, self.preds, v))
+                for i in c:
+                    components[i] = num_components
+                num_components += 1
+                seen.update(c)
+        return num_components, components

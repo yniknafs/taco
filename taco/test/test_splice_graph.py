@@ -12,7 +12,7 @@ from taco.lib.cchangepoint import find_threshold_points as \
     find_threshold_points_cy
 from taco.lib.changepoint import find_threshold_points
 from taco.lib.locus import Locus
-from taco.lib.splice_graph import split_transfrag, SpliceGraph, SGNode
+from taco.lib.splice_graph import split_transfrag, SpliceGraph
 
 from taco.test.base import read_gtf, read_single_locus
 
@@ -62,39 +62,35 @@ def test_mark_start_stop_sites1():
     G = sgraph.G
     assert len(G) == 1
     n_id = sgraph.get_node_id(Exon(50, 200))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert sgraph.G.is_stop[n_id]
+
     # add a start site change point
     sgraph.start_sites.add(125)
     sgraph.recreate()
     G = sgraph.G
     assert len(G) == 2
     n_id = sgraph.get_node_id(Exon(50, 125))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and not nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert not sgraph.G.is_stop[n_id]
     n_id = sgraph.get_node_id(Exon(125, 200))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert sgraph.G.is_stop[n_id]
+
     # add a stop site change point
     sgraph.stop_sites.add(80)
     sgraph.recreate()
     G = sgraph.G
     assert len(G) == 3
     n_id = sgraph.get_node_id(Exon(50, 80))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert sgraph.G.is_stop[n_id]
     n_id = sgraph.get_node_id(Exon(80, 125))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert not nd[SGNode.IS_START] and not nd[SGNode.IS_STOP]
+    assert not sgraph.G.is_start[n_id]
+    assert not sgraph.G.is_stop[n_id]
     n_id = sgraph.get_node_id(Exon(125, 200))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert sgraph.G.is_stop[n_id]
 
     # flip strand
     for t_id, t in t_dict.iteritems():
@@ -104,22 +100,21 @@ def test_mark_start_stop_sites1():
     assert len(G) == 1
 
     n_id = sgraph.get_node_id(Exon(50, 200))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert sgraph.G.is_stop[n_id]
+
     # add a start site change point
     sgraph.start_sites.add(125)
     sgraph.recreate()
     G = sgraph.G
     assert len(G) == 2
     n_id = sgraph.get_node_id(Exon(50, 125))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert sgraph.G.is_stop[n_id]
+
     n_id = sgraph.get_node_id(Exon(125, 200))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and not nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert not sgraph.G.is_stop[n_id]
 
     # add a stop site change point
     sgraph.stop_sites.add(80)
@@ -127,17 +122,14 @@ def test_mark_start_stop_sites1():
     G = sgraph.G
     assert len(G) == 3
     n_id = sgraph.get_node_id(Exon(50, 80))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert not nd[SGNode.IS_START] and nd[SGNode.IS_STOP]
+    assert not sgraph.G.is_start[n_id]
+    assert sgraph.G.is_stop[n_id]
     n_id = sgraph.get_node_id(Exon(80, 125))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert sgraph.G.is_stop[n_id]
     n_id = sgraph.get_node_id(Exon(125, 200))
-    assert n_id in G
-    nd = sgraph.G.node[n_id]
-    assert nd[SGNode.IS_START] and not nd[SGNode.IS_STOP]
+    assert sgraph.G.is_start[n_id]
+    assert not sgraph.G.is_stop[n_id]
 
 
 def test_mark_start_stop_sites2():
@@ -145,41 +137,40 @@ def test_mark_start_stop_sites2():
     t_dict, locus = read_single_locus('multi_strand1.gtf')
     sgraph = SpliceGraph.create(locus.get_transfrags(Strand.POS))
     G = sgraph.G
-    assert G.node[sgraph.get_node_id(Exon(100, 200))][SGNode.IS_START]
-    assert G.node[sgraph.get_node_id(Exon(400, 650))][SGNode.IS_STOP]
+    assert G.is_start[sgraph.get_node_id(Exon(100, 200))]
+    assert G.is_stop[sgraph.get_node_id(Exon(400, 650))]
 
     # neg strand not guided
     sgraph = SpliceGraph.create(locus.get_transfrags(Strand.NEG))
     G = sgraph.G
-    assert G.node[sgraph.get_node_id(Exon(950, 980))][SGNode.IS_START]
-    assert G.node[sgraph.get_node_id(Exon(400, 500))][SGNode.IS_STOP]
+    assert G.is_start[sgraph.get_node_id(Exon(950, 980))]
+    assert G.is_stop[sgraph.get_node_id(Exon(400, 500))]
 
     # pos strand guided
     sgraph = SpliceGraph.create(locus.get_transfrags(Strand.POS),
                                 guided_ends=True,
                                 guided_assembly=True)
     G = sgraph.G
-    assert G.node[sgraph.get_node_id(Exon(100, 150))][SGNode.IS_START]
-    assert G.node[sgraph.get_node_id(Exon(150, 200))][SGNode.IS_START]
-    assert G.node[sgraph.get_node_id(Exon(500, 600))][SGNode.IS_STOP]
-    assert G.node[sgraph.get_node_id(Exon(600, 650))][SGNode.IS_STOP]
-    assert G.node[sgraph.get_node_id(Exon(150, 200))][SGNode.IS_REF]
-    assert G.node[sgraph.get_node_id(Exon(300, 400))][SGNode.IS_REF]
-    assert G.node[sgraph.get_node_id(Exon(500, 600))][SGNode.IS_REF]
-    assert not G.node[sgraph.get_node_id(Exon(100, 150))][SGNode.IS_REF]
-    assert not G.node[sgraph.get_node_id(Exon(600, 650))][SGNode.IS_REF]
+    assert G.is_start[sgraph.get_node_id(Exon(100, 150))]
+    assert G.is_start[sgraph.get_node_id(Exon(150, 200))]
+    assert G.is_stop[sgraph.get_node_id(Exon(500, 600))]
+    assert G.is_stop[sgraph.get_node_id(Exon(600, 650))]
+    assert G.is_ref[sgraph.get_node_id(Exon(150, 200))]
+    assert G.is_ref[sgraph.get_node_id(Exon(300, 400))]
+    assert G.is_ref[sgraph.get_node_id(Exon(500, 600))]
+    assert not G.is_ref[sgraph.get_node_id(Exon(100, 150))]
+    assert not G.is_ref[sgraph.get_node_id(Exon(600, 650))]
 
     # neg strand guided
     sgraph = SpliceGraph.create(locus.get_transfrags(Strand.NEG),
                                 guided_ends=True,
                                 guided_assembly=True)
     G = sgraph.G
-    assert G.node[sgraph.get_node_id(Exon(350, 400))][SGNode.IS_STOP]
-    assert G.node[sgraph.get_node_id(Exon(980, 1000))][SGNode.IS_START]
-    assert not G.node[sgraph.get_node_id(Exon(950, 980))][SGNode.IS_START]
-    for n, nd in G.nodes_iter(data=True):
-        assert nd[SGNode.IS_REF]
-    return
+    assert G.is_stop[sgraph.get_node_id(Exon(350, 400))]
+    assert G.is_start[sgraph.get_node_id(Exon(980, 1000))]
+    assert not G.is_start[sgraph.get_node_id(Exon(950, 980))]
+    for n_id in G.node_ids_iter():
+        assert G.is_ref[n_id]
 
 
 def test_split_transfrag():

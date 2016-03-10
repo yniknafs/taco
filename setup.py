@@ -38,7 +38,11 @@ cython_extensions = [
     Extension('taco.lib.cbisect',
               sources=['taco/lib/cbisect.pyx', 'taco/lib/bsearch.c']),
     Extension('taco.lib.scipy.norm_sf',
-              sources=['taco/lib/scipy/norm_sf.pyx', 'taco/lib/scipy/ndtr.c'],
+              sources=['taco/lib/scipy/norm_sf.pyx',
+                       'taco/lib/scipy/ndtr.c',
+                       'taco/lib/scipy/const.c',
+                       'taco/lib/scipy/mtherr.c',
+                       'taco/lib/scipy/sf_error.c'],
               include_dirs=[numpy_inc, 'taco/lib/scipy'])
 ]
 
@@ -53,7 +57,7 @@ def main():
           description='transcriptome meta-assembly from rna-seq',
           author='Matthew Iyer, Yashar Niknafs, Balaji Pandian',
           author_email='yniknafs@umich.edu',
-          requires=['numpy', 'networkx', 'h5py'],
+          requires=['numpy', 'h5py'],
           license='GPL',
           platforms='Linux',
           url='https://github.com/yniknafs/taco',
