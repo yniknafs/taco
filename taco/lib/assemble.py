@@ -358,8 +358,6 @@ def assemble_locus(gtf_lines, config):
     locus.write_bedgraph(config.resolved_bg_fhs)
     # write splice junctions
     locus.write_splice_bed(config.splice_bed_fh)
-    # write expression array
-    locus.write_expression_hdf5(config.expr_h5fh)
     # convert to stranded locus objects
     locus_id_str = "L%d" % (config.locus_id_value_obj.next())
     for sgraph in locus.create_splice_graphs():
@@ -408,9 +406,6 @@ def assemble(**kwargs):
         config.resolved_bg_fhs.append(open(filename, 'w'))
     # setup junction bed file
     config.splice_bed_fh = Locus.open_splice_bed(config.splice_bed_file)
-    # setup expression hdf5
-    config.expr_h5fh = Locus.open_expression_hdf5(config.expr_h5_file,
-                                                  config.chrom_sizes_file)
     # splice graph gtf file
     config.splice_graph_gtf_fh = open(config.splice_graph_gtf_file, 'w')
     # path graph stats file
@@ -437,7 +432,6 @@ def assemble(**kwargs):
     config.assembly_loss_gtf_fh.close()
     config.path_graph_stats_fh.close()
     config.splice_graph_gtf_fh.close()
-    config.expr_h5fh.close()
     config.splice_bed_fh.close()
     Locus.close_bedgraphs(config.unresolved_bg_fhs)
     Locus.close_bedgraphs(config.resolved_bg_fhs)

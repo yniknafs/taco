@@ -294,7 +294,6 @@ class Results(object):
     TRANSFRAGS_FAIL_GTF_FILE = 'transfrags.fail.gtf'
     AGGREGATE_STATS_FILE = 'aggregate_stats.txt'
     LOCUS_STATS_FILE = 'locus_stats.txt'
-    EXPR_H5_FILE = 'expression.h5'
     SPLICE_GRAPH_GTF_FILE = 'splice_graph.gtf'
     BEDGRAPH_UNRESOLVED_PREFIX = 'loci.unresolved'
     BEDGRAPH_RESOLVED_PREFIX = 'loci.resolved'
@@ -320,7 +319,6 @@ class Results(object):
             os.path.join(output_dir, Results.AGGREGATE_STATS_FILE)
         self.locus_stats_file = \
             os.path.join(output_dir, Results.LOCUS_STATS_FILE)
-        self.expr_h5_file = os.path.join(output_dir, Results.EXPR_H5_FILE)
         self.splice_graph_gtf_file = \
             os.path.join(output_dir, Results.SPLICE_GRAPH_GTF_FILE)
         file_prefix = \
@@ -440,6 +438,5 @@ class Run(object):
         kwargs.update(vars(self.results))
         assemble(**kwargs)
         # update status and write to file
-        # TODO: uncomment
-        # self.status.assemble = True
-        # self.status.write(self.results.status_file)
+        self.status.assemble = True
+        self.status.write(self.results.status_file)

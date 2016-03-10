@@ -253,28 +253,3 @@ class Locus(object):
                       str(start - 1), str(end + 1), '255,0,0',
                       '2', '1,1', '0,%d' % (end + 1 - start)]
             print >>fh, '\t'.join(fields)
-
-    @staticmethod
-    def open_expression_hdf5(filename, chrom_sizes_file):
-        # read chrom sizes
-        chrom_sizes = {}
-        with open(chrom_sizes_file) as f:
-            for line in f:
-                fields = line.strip().split('\t')
-                chrom_sizes[fields[0]] = int(fields[1])
-        # create h5py datasets
-        h5f = h5py.File(filename, mode='a', libver='latest')
-        for ref, length in chrom_sizes.iteritems():
-            chunksize = (3, min(H5_CHUNKSIZE, length))
-            h5f.require_dataset(ref, shape=(3, length),
-                                dtype=FLOAT_DTYPE,
-                                exact=True,
-                                chunks=chunksize,
-                                compression='lzf',
-                                shuffle=True)
-        return h5f
-
-    def write_expression_hdf5(self, h5f):
-        '''writes locus expression to 'h5f' an h5py.File object'''
-        dset = h5f[self.chrom]
-        dset[:, self.start:self.end] = self.expr_data

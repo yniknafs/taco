@@ -19,7 +19,7 @@ __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
-PROFILE = True
+PROFILE = False
 PROFILE_FILENAME = 'taco.prof'
 
 
