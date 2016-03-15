@@ -20,7 +20,7 @@ __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "0.4.0"
+__version__ = "0.4.2"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -209,20 +209,21 @@ def assemble_isoforms(sgraph, config):
     # smooth kmer graph
     K.apply_smoothing()
 
-    logging.debug('%s:%d-%d[%s] finding paths in k=%d graph '
-                  '(%d kmers) source_expr=%f' %
-                  (sgraph.chrom, sgraph.start, sgraph.end,
-                   Strand.to_gtf(sgraph.strand), k, len(K),
-                   K.exprs[K.SOURCE_ID]))
+    genome_id_str = ('%s:%d-%d[%s]' %
+                     (sgraph.chrom, sgraph.start, sgraph.end,
+                      Strand.to_gtf(sgraph.strand)))
+    logging.debug('(%s) finding isoforms in k=%d graph (%d kmers) '
+                  'source_expr=%f' %
+                  (genome_id_str, k, len(K), K.exprs[K.SOURCE_ID]))
     paths = []
     for kmer_path, expr in find_paths(K, config.path_frac, config.max_paths):
         path = reconstruct_path(kmer_path, K, sgraph)
-        logging.debug("\texpr=%f length=%d" % (expr, len(path)))
         paths.append((path, expr))
+    logging.debug('(%s) isoforms: %d' % (genome_id_str, len(paths)))
     # build gene clusters
     clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac)
-    logging.debug('\tclusters: %d filtered: %d' %
-                  (len(clusters), len(filtered)))
+    logging.debug('(%s) gene clusters: %d filtered transfrags: %d' %
+                  (genome_id_str, len(clusters), len(filtered)))
     gene_isoforms = []
     for cluster in clusters:
         isoforms = []
@@ -237,9 +238,11 @@ def assemble_isoforms(sgraph, config):
 
 
 def assemble_gene(sgraph, locus_id_str, config):
-    logging.debug('%s:%d-%d[%s] nodes=%d' %
-                  (sgraph.chrom, sgraph.start, sgraph.end,
-                   Strand.to_gtf(sgraph.strand), len(sgraph.G)))
+    genome_id_str = ('%s:%d-%d[%s]' %
+                     (sgraph.chrom, sgraph.start, sgraph.end,
+                      Strand.to_gtf(sgraph.strand)))
+    logging.debug('(%s) locus: %s nodes: %d' %
+                  (genome_id_str, locus_id_str, len(sgraph.G)))
     # output splice graph node data
     for f in sgraph.get_node_gtf():
         print >>config.splice_graph_gtf_fh, str(f)
@@ -249,9 +252,8 @@ def assemble_gene(sgraph, locus_id_str, config):
         changepts = sgraph.detect_change_points(
             pval=config.change_point_pvalue,
             fc_cutoff=config.change_point_fold_change)
-        logging.debug('%s:%d-%d[%s] change points: %d' %
-                      (sgraph.chrom, sgraph.start, sgraph.end,
-                       Strand.to_gtf(sgraph.strand), len(changepts)))
+        logging.debug('(%s) locus %s change points: %d' %
+                      (genome_id_str, locus_id_str, len(changepts)))
         for cp in changepts:
             sgraph.apply_change_point(cp, config.change_point_trim)
             # output splice graph change points
@@ -299,16 +301,17 @@ def assemble_locus(locus_id, transfrags, config):
                          config.guided_strand,
                          config.guided_ends,
                          config.guided_assembly)
-    logging.debug('\t%d transfrags (+: %d, -: %d, .: %d)' %
-                  (len(transfrags),
+    genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
+    logging.debug('(%s) locus: %s transfrags: %d (+: %d, -: %d, .: %d)' %
+                  (genome_id_str, locus_id, len(transfrags),
                    len(locus.get_transfrags(Strand.POS)),
                    len(locus.get_transfrags(Strand.NEG)),
                    len(locus.get_transfrags(Strand.NA))))
     # resolve unstranded transcripts
     num_resolved = locus.impute_unknown_strands()
     if num_resolved > 0:
-        logging.debug('\t%d resolved (+: %d, -: %d, .: %d)' %
-                      (num_resolved,
+        logging.debug('(%s) locus: %s resolved: %d (+: %d, -: %d, .: %d)' %
+                      (genome_id_str, locus_id, num_resolved,
                        len(locus.get_transfrags(Strand.POS)),
                        len(locus.get_transfrags(Strand.NEG)),
                        len(locus.get_transfrags(Strand.NA))))
@@ -322,8 +325,8 @@ def assemble_locus(locus_id, transfrags, config):
 
 
 def parse_gtf_locus(locus, gtf_fileh):
-    logging.debug('Locus %s (%s:%d-%d) %d lines: ' %
-                  (locus.name, locus.chrom, locus.start, locus.end,
+    logging.debug('[%s:%d-%d] locus: %s features: %d' %
+                  (locus.chrom, locus.start, locus.end, locus.name,
                    locus.num_lines))
     # fast-forward to 'filepos'
     gtf_fileh.seek(locus.filepos)
@@ -498,12 +501,49 @@ def assemble_worker(state):
     # cleanup and close files
     state.close()
     # sort output files
-    logging.debug('Sorting worker output files at "%s"' %
+    logging.debug('\tsorting worker output files: "%s"' %
                   (state.results.output_dir))
     state.sort_output_files()
 
 
 def assemble_parallel(args, results):
+    '''
+    args: from Argparse module. command-line arguments to configure the
+          assembly process
+    results: Results object containing input and output filenames
+
+    Args
+    ====
+    - guided_strand
+    - guided_ends
+    - guided_assembly
+    - change_point
+    - change_point_pvalue
+    - change_point_fold_change
+    - change_point_trim
+    - path_graph_kmax
+    - path_graph_loss_threshold
+    - path_frac
+    - max_paths
+    - isoform_frac
+    - max_isoforms
+
+    Results
+    =======
+    Input file attributes:
+    - locus_index_file
+    - transfrags_gtf_file
+
+    Output file attributes:
+    - bedgraph_files
+    - splice_bed_file
+    - splice_graph_gtf_file
+    - path_graph_stats_file
+    - assembly_gtf_file
+    - assembly_bed_file
+    '''
+    logging.info('Assembling in parallel using %d processes' %
+                 (args.num_processes))
     # create queue
     input_queue = JoinableQueue(maxsize=args.num_processes * 2)
     gtf_file = results.transfrags_gtf_file
@@ -515,7 +555,7 @@ def assemble_parallel(args, results):
         worker_id = 'worker%03d' % i
         worker_dir = os.path.join(results.tmp_dir, worker_id)
         if not os.path.exists(worker_dir):
-            logging.debug("Creating worker directory '%s'" % (worker_dir))
+            logging.debug("\tcreating worker directory '%s'" % (worker_dir))
             os.makedirs(worker_dir)
         worker_results.append(Results(worker_dir))
         worker_state = WorkerState(gtf_file, input_queue, global_ids,
@@ -546,7 +586,7 @@ def assemble_parallel(args, results):
         for fh in fhs:
             fh.close()
 
-    logging.debug('Merging output files')
+    logging.info('Merging output files')
     logging.debug('\tmerging bedgraph files')
     for i, output_file in enumerate(results.bedgraph_files):
         input_files = [r.bedgraph_files[i] for r in worker_results]
@@ -579,87 +619,10 @@ def assemble_parallel(args, results):
           output_file=results.assembly_gtf_file,
           key=sort_key_gtf)
     # cleanup worker data
+    logging.info('Removing temporary files')
+    def shutil_error_callback(func, path, excinfo):
+        logging.error('Error removing tmp files path=%s message=%s' %
+                      (path, excinfo))
     for r in worker_results:
-        shutil.rmtree(r.output_dir)
+        shutil.rmtree(r.output_dir, onerror=shutil_error_callback)
     return 0
-
-
-def assemble(**kwargs):
-    '''
-    kwargs: dict containing arguments and input/output file locations
-
-    Configuration attributes:
-    - guided_strand
-    - guided_ends
-    - guided_assembly
-    - change_point
-    - change_point_pvalue
-    - change_point_fold_change
-    - change_point_trim
-    - path_graph_kmax
-    - path_graph_loss_threshold
-    - path_frac
-    - max_paths
-    - isoform_frac
-    - max_isoforms
-
-    Input file attributes:
-    - locus_index_file
-    - transfrags_gtf_file
-
-    Output file attributes:
-    - unresolved_bg_files
-    - resolved_bg_files
-    - splice_bed_file
-    - splice_graph_gtf_file
-    - path_graph_stats_file
-    - assembly_gtf_file
-    - assembly_bed_file
-    '''
-    config = Config(**kwargs)
-    # setup bedgraph output files
-    for s, filename in config.unresolved_bg_files:
-        config.unresolved_bg_fhs.append(open(filename, 'w'))
-    for s, filename in config.resolved_bg_files:
-        config.resolved_bg_fhs.append(open(filename, 'w'))
-    # setup junction bed file
-    config.splice_bed_fh = Locus.open_splice_bed(config.splice_bed_file)
-    # splice graph gtf file
-    config.splice_graph_gtf_fh = open(config.splice_graph_gtf_file, 'w')
-    # path graph stats file
-    config.path_graph_stats_fh = open(config.path_graph_stats_file, 'w')
-    fields = ['locus', 'k', 'kmax', 'transfrags', 'kmers',
-              'short_transfrags', 'lost_kmers', 'tot_expr', 'lost_expr',
-              'lost_expr_frac', 'valid']
-    print >>config.path_graph_stats_fh, '\t'.join(fields)
-
-    # assembly gtf and bed files
-    config.assembly_gtf_fh = open(config.assembly_gtf_file, 'w')
-    config.assembly_bed_fh = open(config.assembly_bed_file, 'w')
-
-    # parse locus file
-    with open(config.locus_index_file) as locus_fileh:
-        for line in locus_fileh:
-            fields = line.strip().split('\t')
-            locus_id = fields[0]
-            chrom = fields[1]
-            start = int(fields[2])
-            end = int(fields[3])
-            filepos = int(fields[4])
-            num_lines = int(fields[5])
-            assemble_locus2(locus_id, chrom, start, end, filepos, num_lines, config)
-    #
-    # # parse gtf file
-    # for interval, gtf_lines in GTF.parse_loci(open(config.transfrags_gtf_file)):
-    #     chrom, start, end = interval
-    #     logging.debug('Locus %s:%d-%d: ' % (chrom, start, end))
-    #     assemble_locus(gtf_lines, config)
-
-    # cleanup and close files
-    config.assembly_gtf_fh.close()
-    config.assembly_bed_fh.close()
-    config.path_graph_stats_fh.close()
-    config.splice_graph_gtf_fh.close()
-    config.splice_bed_fh.close()
-    Locus.close_bedgraphs(config.unresolved_bg_fhs)
-    Locus.close_bedgraphs(config.resolved_bg_fhs)

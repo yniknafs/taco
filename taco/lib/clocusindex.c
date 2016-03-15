@@ -1,6 +1,6 @@
 //
 // TACO
-// clocus.c
+// clocusindex.c
 //
 #include <Python.h>
 
@@ -20,13 +20,13 @@ py_gtf_index_loci(PyObject *self, PyObject *args) {
     return Py_BuildValue("i", ret);
 }
 
-static PyMethodDef CLocusMethods[] = {
+static PyMethodDef CLocusIndexMethods[] = {
     {"gtf_index_loci", py_gtf_index_loci, METH_VARARGS},
     {NULL, NULL, 0, NULL}
 };
 
 PyMODINIT_FUNC
-initclocus(void)
+initclocusindex(void)
 {
-    (void) Py_InitModule("clocus", CLocusMethods);
+    (void) Py_InitModule("clocusindex", CLocusIndexMethods);
 }

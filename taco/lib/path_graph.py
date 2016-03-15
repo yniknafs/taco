@@ -136,12 +136,6 @@ class PathGraphFactory(object):
             tot_expr = sum(K.exprs[i] for i in K.node_ids_iter())
             lost_expr = K.lost_kmer_expr
             lost_expr_frac = 0.0 if tot_expr == 0 else lost_expr / tot_expr
-            logging.debug('%s k=%d kmax=%d t=%d kmers=%d short_transfrags=%d '
-                          'lost_kmers=%d tot_expr=%.3f lost_expr=%.3f '
-                          'lost_expr_frac=%.3f valid=%d' %
-                          (id_str, k, kmax, len(self.paths), K.n,
-                           len(K.short_transfrags), K.num_lost_kmers, tot_expr,
-                           lost_expr, lost_expr_frac, int(K.valid)))
             if stats_fh:
                 fields = [self.chrom, self.start, self.end,
                           Strand.to_gtf(self.strand), k, kmax,
@@ -156,10 +150,14 @@ class PathGraphFactory(object):
             return len(K)
 
         k, num_kmers = maximize_bisect(compute_kmers, 1, kmax, 0)
-        logging.debug('Creating path graph k=%d num_kmers=%d' % (k, num_kmers))
+        logging.debug('(%s) creating path graph k=%d num_kmers=%d' %
+                      (id_str, k, num_kmers))
         K = self.create(k)
-        logging.debug('Rescuing short transfrags kmers=%d' % len(K))
-        self.rescue_short_transfrags(K, K.short_transfrags)
+        logging.debug('(%s) rescuing short transfrags kmers=%d' %
+                      (id_str, len(K)))
+        num_lost = self.rescue_short_transfrags(K, K.short_transfrags)
+        logging.debug('(%s) lost %d of %d short transfrags' %
+                      (id_str, num_lost, len(K.short_transfrags)))
         return K, k
 
     def rescue_short_transfrags(self, K, indexes):
@@ -187,15 +185,13 @@ class PathGraphFactory(object):
                 matching_paths.append((kmer_id, new_expr))
             if len(matching_paths) == 0:
                 lost_transfrags.append(i)
-                t = self.transfrags[i]
             kmer_exprs.extend(matching_paths)
         # add short transfrag kmers
         for kmer_id, expr in kmer_exprs:
             K.exprs[kmer_id] += expr
             K.smooth_rev[kmer_id] += expr
             K.smooth_fwd[kmer_id] += expr
-        logging.debug('\tlost %d of %d short transfrags' %
-                      (len(lost_transfrags), len(indexes)))
+        return len(lost_transfrags)
 
 
 class PathGraph(Graph):

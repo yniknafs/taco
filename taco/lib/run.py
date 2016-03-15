@@ -16,13 +16,13 @@ from base import Sample, Results
 from locus import Locus
 from aggregate import aggregate
 from assemble import assemble_parallel
-from clocus import gtf_index_loci
+from clocusindex import gtf_index_loci
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2015"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -325,8 +325,8 @@ class Run(object):
         else:
             level = logging.INFO
         logging.basicConfig(level=level,
-                            format="%(levelname)s - %(message)s")
-
+                            format="%(asctime)s pid=%(process)d "
+                                   "%(levelname)s - %(message)s")
         # create output directories
         results = self.results
         if not os.path.exists(results.output_dir):
@@ -381,5 +381,5 @@ class Run(object):
     def assemble(self):
         assemble_parallel(self.args, self.results)
         # update status and write to file
-        #self.status.assemble = True
-        #self.status.write(self.results.status_file)
+        self.status.assemble = True
+        self.status.write(self.results.status_file)

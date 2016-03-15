@@ -290,6 +290,8 @@ class SpliceGraph(object):
 
         returns list of ChangePoint tuples
         '''
+        genome_id_str = ('%s:%d-%d[%s]' % (self.chrom, self.start, self.end,
+                         Strand.to_gtf(self.strand)))
         changepts = []
         for n in self.G.nodes_iter():
             expr_data = self.get_expr_data(*n)
@@ -299,10 +301,9 @@ class SpliceGraph(object):
                                  start=n.start + cp.start,
                                  end=n.start + cp.end)
                 changepts.append(cp)
-                logging.debug('\t%s:%d-%d[%s] node: %s-%s cp:%d(%d-%d) '
-                              'p=%.3f fc=%.3f' %
-                              (self.chrom, self.start, self.end,
-                               Strand.to_gtf(self.strand), n.start,
+                logging.debug('(%s) changepoint node: %s-%s '
+                              'cp:%d(%d-%d) p=%.3f fc=%.3f' %
+                              (genome_id_str, n.start,
                                n.end, cp.pos, cp.start, cp.end,
                                cp.pvalue, cp.foldchange))
         return changepts

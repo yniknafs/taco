@@ -27,7 +27,7 @@ def main():
     # instantiate from command line
     R = Run.create()
     R.log_args()
-    logging.debug('Samples: %d' % (len(R.samples)))
+    logging.info('Samples: %d' % (len(R.samples)))
     # merge gtf files
     msg = 'Aggregating GTF files'
     if R.status.aggregate:
@@ -49,7 +49,6 @@ def main():
     else:
         logging.info(msg)
         R.assemble()
-
     return 0
 
 

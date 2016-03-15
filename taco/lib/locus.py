@@ -187,10 +187,6 @@ class Locus(object):
             for t in unstranded_transfrags:
                 self._add_transfrag(t)
             self.strand_transfrags[Strand.NA] = unstranded_transfrags
-
-        if iterations > 0:
-            logging.debug('predict_unknown_strands: %d iterations' %
-                          iterations)
         return num_resolved
 
     def get_expr_data(self, start, end, strand):

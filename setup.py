@@ -12,7 +12,7 @@ __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2016"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -48,8 +48,8 @@ cython_extensions = [
 
 extensions = [
     Extension('taco.lib.caggregate', sources=['taco/lib/caggregate.c']),
-    Extension('taco.lib.clocus',
-              sources=['taco/lib/clocus.c',
+    Extension('taco.lib.clocusindex',
+              sources=['taco/lib/clocusindex.c',
                        'taco/lib/cgtf.c'],
               include_dirs=['taco/lib'])
 ]
