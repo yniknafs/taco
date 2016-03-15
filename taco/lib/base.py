@@ -103,3 +103,48 @@ class Sample(object):
             logging.error('GTF file %s not found' % (gtf_file))
             return False
         return True
+
+
+class Results(object):
+    TMP_DIR = 'tmp'
+    STATUS_FILE = 'status.json'
+    ARGS_FILE = 'args.pickle'
+    SAMPLE_FILE = 'samples.txt'
+    TRANSFRAGS_GTF_FILE = 'transfrags.gtf'
+    TRANSFRAGS_FAIL_GTF_FILE = 'transfrags.fail.gtf'
+    AGGREGATE_STATS_FILE = 'aggregate_stats.txt'
+    LOCUS_INDEX_FILE = 'loci.txt'
+    SPLICE_GRAPH_GTF_FILE = 'splice_graph.gtf'
+    BEDGRAPH_FILES = ['expr.pos.bedgraph', 'expr.neg.bedgraph',
+                      'expr.none.bedgraph']
+    SPLICE_BED_FILE = 'splice_junctions.bed'
+    PATH_GRAPH_STATS_FILE = 'path_graph_stats.txt'
+    ASSEMBLY_GTF_FILE = 'assembly.gtf'
+    ASSEMBLY_BED_FILE = 'assembly.bed'
+
+    def __init__(self, output_dir):
+        self.output_dir = output_dir
+        self.tmp_dir = os.path.join(output_dir, Results.TMP_DIR)
+        self.args_file = os.path.join(output_dir, Results.ARGS_FILE)
+        self.status_file = os.path.join(output_dir, Results.STATUS_FILE)
+        self.sample_file = os.path.join(output_dir, Results.SAMPLE_FILE)
+        self.aggregate_stats_file = \
+            os.path.join(output_dir, Results.AGGREGATE_STATS_FILE)
+        self.locus_index_file = \
+            os.path.join(output_dir, Results.LOCUS_INDEX_FILE)
+        self.transfrags_gtf_file = \
+            os.path.join(output_dir, Results.TRANSFRAGS_GTF_FILE)
+        self.transfrags_fail_gtf_file = \
+            os.path.join(output_dir, Results.TRANSFRAGS_FAIL_GTF_FILE)
+        self.splice_graph_gtf_file = \
+            os.path.join(output_dir, Results.SPLICE_GRAPH_GTF_FILE)
+        self.bedgraph_files = [os.path.join(output_dir, x)
+                               for x in Results.BEDGRAPH_FILES]
+        self.splice_bed_file = \
+            os.path.join(output_dir, Results.SPLICE_BED_FILE)
+        self.path_graph_stats_file = \
+            os.path.join(output_dir, Results.PATH_GRAPH_STATS_FILE)
+        self.assembly_gtf_file = \
+            os.path.join(output_dir, Results.ASSEMBLY_GTF_FILE)
+        self.assembly_bed_file = \
+            os.path.join(output_dir, Results.ASSEMBLY_BED_FILE)

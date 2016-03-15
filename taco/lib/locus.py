@@ -205,24 +205,6 @@ class Locus(object):
     def get_transfrags(self, strand):
         return self.strand_transfrags[strand]
 
-    @staticmethod
-    def get_bedgraph_file_names(file_prefix):
-        for s in (Strand.POS, Strand.NEG, Strand.NA):
-            filename = '%s.%s.bedgraph' % (file_prefix, Strand.NAMES[s])
-            yield (s, filename)
-
-    @staticmethod
-    def open_bedgraphs(file_prefix):
-        bgfilehs = []
-        for s, filename in Locus.get_bedgraph_file_names(file_prefix):
-            bgfilehs.append(open(filename, 'w'))
-        return bgfilehs
-
-    @staticmethod
-    def close_bedgraphs(bgfilehs):
-        for fileh in bgfilehs:
-            fileh.close()
-
     def write_bedgraph(self, bgfilehs):
         for s in self.strands:
             array_to_bedgraph(a=self.expr_data[s, :],

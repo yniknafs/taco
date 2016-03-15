@@ -35,6 +35,13 @@ def main():
     else:
         logging.info(msg)
         R.aggregate()
+    # index loci
+    msg = 'Indexing Loci'
+    if R.status.index_loci:
+        logging.info('[SKIPPING] %s' % msg)
+    else:
+        logging.info(msg)
+        R.index_loci()
     # assemble
     msg = 'Assembling GTF files'
     if R.status.assemble:

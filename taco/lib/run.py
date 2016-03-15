@@ -12,16 +12,17 @@ import pickle
 import json
 import shutil
 
-from base import Sample
+from base import Sample, Results
 from locus import Locus
 from aggregate import aggregate
-from assemble import assemble
+from assemble import assemble_parallel
+from clocus import gtf_index_loci
 
 __author__ = "Matthew Iyer and Yashar Niknafs"
 __copyright__ = "Copyright 2015"
 __credits__ = ["Matthew Iyer", "Yashar Niknafs"]
 __license__ = "GPL"
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __maintainer__ = "Yashar Niknafs"
 __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
@@ -29,6 +30,7 @@ __status__ = "Development"
 
 class Args:
     VERBOSE = False
+    NUM_PROCESSES = 1
     GUIDED_ASSEMBLY = False
     GUIDED_STRAND = False
     GUIDED_ENDS = False
@@ -61,6 +63,12 @@ class Args:
                             default=Args.VERBOSE,
                             help='Enabled detailed logging '
                             '(for debugging)')
+        parser.add_argument('-p', '--num-processes', type=int,
+                            metavar='N',
+                            dest='num_processes',
+                            default=Args.NUM_PROCESSES,
+                            help='Assembly loci in parallel with N '
+                            'processes [default=%(default)s]')
         parser.add_argument('--ref-gtf', dest='ref_gtf_file',
                             metavar='<gtf_file>',
                             default=None,
@@ -107,11 +115,6 @@ class Args:
                             default=Args.MAX_ISOFORMS,
                             help='Maximum isoforms to report for each '
                             'gene [default=%(default)s]')
-        parser.add_argument('--chrom-sizes', dest='chrom_sizes_file',
-                            metavar='<filename>',
-                            default=None,
-                            help='path to file containing chromosome names '
-                            'and lengths (required)')
         parser.add_argument("-o", "--output-dir", dest="output_dir",
                             metavar='DIR',
                             default=Args.OUTPUT_DIR,
@@ -196,8 +199,8 @@ class Args:
         fmt = '{:<35}{:<35}'
         func(spacer)
         func(fmt.format('verbose logging:', str(args.verbose)))
+        func(fmt.format('num processes:', str(args.num_processes)))
         func(fmt.format('output directory:', str(args.output_dir)))
-        func(fmt.format('chrom sizes file:', str(args.chrom_sizes_file)))
         func(fmt.format('reference GTF file:', str(args.ref_gtf_file)))
         func(fmt.format('guided assembly mode:', str(args.guided_assembly)))
         func(fmt.format('guided strand mode:', str(args.guided_strand)))
@@ -244,13 +247,6 @@ class Args:
                 parser.error("sample file %s not found" % (args.sample_file))
             args.sample_file = os.path.abspath(args.sample_file)
 
-            if args.chrom_sizes_file is None:
-                parser.error('chrom sizes file not specified')
-            if not os.path.exists(args.chrom_sizes_file):
-                parser.error('chrom sizes file %s not found' %
-                             (args.chrom_sizes_file))
-            args.chrom_sizes_file = os.path.abspath(args.chrom_sizes_file)
-
             if args.min_frag_length < 0:
                 parser.error("min_frag_length < 0")
             if (args.isoform_frac < 0) or (args.isoform_frac > 1):
@@ -284,65 +280,8 @@ class Args:
         return args
 
 
-class Results(object):
-    TMP_DIR = 'tmp'
-    STATUS_FILE = 'status.json'
-    ARGS_FILE = 'args.pickle'
-    SAMPLE_FILE = 'samples.txt'
-    CHROM_SIZES_FILE = 'chrom.sizes'
-    TRANSFRAGS_GTF_FILE = 'transfrags.gtf'
-    TRANSFRAGS_FAIL_GTF_FILE = 'transfrags.fail.gtf'
-    AGGREGATE_STATS_FILE = 'aggregate_stats.txt'
-    LOCUS_STATS_FILE = 'locus_stats.txt'
-    SPLICE_GRAPH_GTF_FILE = 'splice_graph.gtf'
-    BEDGRAPH_UNRESOLVED_PREFIX = 'loci.unresolved'
-    BEDGRAPH_RESOLVED_PREFIX = 'loci.resolved'
-    SPLICE_BED_FILE = 'splice_junctions.bed'
-    PATH_GRAPH_STATS_FILE = 'path_graph_stats.txt'
-    ASSEMBLY_LOSS_GTF_FILE = 'assembly.lost.gtf'
-    ASSEMBLY_GTF_FILE = 'assembly.gtf'
-    ASSEMBLY_BED_FILE = 'assembly.bed'
-
-    def __init__(self, output_dir):
-        self.output_dir = output_dir
-        self.tmp_dir = os.path.join(output_dir, Results.TMP_DIR)
-        self.args_file = os.path.join(output_dir, Results.ARGS_FILE)
-        self.status_file = os.path.join(output_dir, Results.STATUS_FILE)
-        self.sample_file = os.path.join(output_dir, Results.SAMPLE_FILE)
-        self.chrom_sizes_file = \
-            os.path.join(output_dir, Results.CHROM_SIZES_FILE)
-        self.transfrags_gtf_file = \
-            os.path.join(output_dir, Results.TRANSFRAGS_GTF_FILE)
-        self.transfrags_fail_gtf_file = \
-            os.path.join(output_dir, Results.TRANSFRAGS_FAIL_GTF_FILE)
-        self.aggregate_stats_file = \
-            os.path.join(output_dir, Results.AGGREGATE_STATS_FILE)
-        self.locus_stats_file = \
-            os.path.join(output_dir, Results.LOCUS_STATS_FILE)
-        self.splice_graph_gtf_file = \
-            os.path.join(output_dir, Results.SPLICE_GRAPH_GTF_FILE)
-        file_prefix = \
-            os.path.join(output_dir, Results.BEDGRAPH_UNRESOLVED_PREFIX)
-        self.unresolved_bg_files = \
-            list(Locus.get_bedgraph_file_names(file_prefix))
-        file_prefix = \
-            os.path.join(output_dir, Results.BEDGRAPH_RESOLVED_PREFIX)
-        self.resolved_bg_files = \
-            list(Locus.get_bedgraph_file_names(file_prefix))
-        self.splice_bed_file = \
-            os.path.join(output_dir, Results.SPLICE_BED_FILE)
-        self.path_graph_stats_file = \
-            os.path.join(output_dir, Results.PATH_GRAPH_STATS_FILE)
-        self.assembly_loss_gtf_file = \
-            os.path.join(output_dir, Results.ASSEMBLY_LOSS_GTF_FILE)
-        self.assembly_gtf_file = \
-            os.path.join(output_dir, Results.ASSEMBLY_GTF_FILE)
-        self.assembly_bed_file = \
-            os.path.join(output_dir, Results.ASSEMBLY_BED_FILE)
-
-
 class Status(object):
-    FIELDS = ('create', 'aggregate', 'assemble')
+    FIELDS = ('create', 'aggregate', 'index_loci', 'assemble')
 
     def __init__(self):
         for f in Status.FIELDS:
@@ -403,9 +342,6 @@ class Run(object):
             Args.dump(self.args, self.results.args_file)
             # write samples
             Sample.write_tsv(self.samples, self.results.sample_file)
-            # copy chrom sizes file to output directory
-            shutil.copyfile(args.chrom_sizes_file,
-                            self.results.chrom_sizes_file)
             # update status and write to file
             self.status.create = True
             self.status.write(self.results.status_file)
@@ -433,10 +369,17 @@ class Run(object):
         self.status.aggregate = True
         self.status.write(self.results.status_file)
 
-    def assemble(self):
-        kwargs = vars(self.args)
-        kwargs.update(vars(self.results))
-        assemble(**kwargs)
+    def index_loci(self):
+        r = self.results
+        retcode = gtf_index_loci(r.transfrags_gtf_file, r.locus_index_file)
+        if retcode != 0:
+            raise TacoError('Error indexing gtf file')
         # update status and write to file
-        self.status.assemble = True
+        self.status.index_loci = True
         self.status.write(self.results.status_file)
+
+    def assemble(self):
+        assemble_parallel(self.args, self.results)
+        # update status and write to file
+        #self.status.assemble = True
+        #self.status.write(self.results.status_file)

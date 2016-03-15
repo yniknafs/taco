@@ -143,9 +143,11 @@ class PathGraphFactory(object):
                            len(K.short_transfrags), K.num_lost_kmers, tot_expr,
                            lost_expr, lost_expr_frac, int(K.valid)))
             if stats_fh:
-                fields = [id_str, k, kmax, len(self.paths), K.n,
-                          len(K.short_transfrags), K.num_lost_kmers, tot_expr,
-                          lost_expr, lost_expr_frac, int(K.valid)]
+                fields = [self.chrom, self.start, self.end,
+                          Strand.to_gtf(self.strand), k, kmax,
+                          len(self.paths), K.n, len(K.short_transfrags),
+                          K.num_lost_kmers, tot_expr, lost_expr,
+                          lost_expr_frac, int(K.valid)]
                 print >>stats_fh, '\t'.join(map(str, fields))
             if not K.valid:
                 return -k

@@ -8,7 +8,6 @@
 //  TODO:
 //  Need to Relay Safety Checks on sizes of strings, etc.
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -101,7 +100,7 @@ void add_bucket_to_hashtable(Hash_node* hash_table_root,
     }
 }
 
-char* increment_node_and_return_id (Hash_node* hash_table_root, char* transcript_id, uint32_t length_increment) {
+char* increment_node_and_return_id(Hash_node* hash_table_root, char* transcript_id, uint32_t length_increment) {
     Hash_node bucket = hash_table_root[fnv_32_str(transcript_id)];
 
     if (strcmp(bucket.transcript_id, transcript_id) == 0) {
@@ -119,7 +118,8 @@ char* increment_node_and_return_id (Hash_node* hash_table_root, char* transcript
 }
 
 void free_all_hashtable_nodes(Hash_node* hash_table_root) {
-    for (uint32_t i = 0; i < HASH_TABLE_SIZE; i++) {
+    uint32_t i;
+    for (i = 0; i < HASH_TABLE_SIZE; i++) {
         Hash_node* temp = &hash_table_root[i];
 
         if (temp->transcript_id != NULL) {

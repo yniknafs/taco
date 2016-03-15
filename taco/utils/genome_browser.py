@@ -7,7 +7,6 @@ import sys
 import argparse
 import logging
 import subprocess
-from itertools import chain
 
 from taco.lib.run import Results
 
@@ -54,6 +53,9 @@ def main():
                         help='path to "bedGraphToBigWig" binary executable')
     parser.add_argument('--igvtools', dest='igvtools',
                         help='path to "igvtools" binary executable')
+    parser.add_argument('--chrom-sizes-file', dest='chrom_sizes_file',
+                        help='path to chromosome sizes file correponding to '
+                        'genome used to align reads')
     parser.add_argument('taco_dir',
                         help='path to taco run output directory')
     args = parser.parse_args()
@@ -74,6 +76,12 @@ def main():
     if igvtools is None:
         parser.error('igvtools executable not found')
 
+    chrom_sizes_file = None
+    if args.chrom_sizes_file and os.path.exists(args.chrom_sizes_file):
+        chrom_sizes_file = args.chrom_sizes_file
+    else:
+        parser.error('chromosome sizes file not found')
+
     output_dir = args.taco_dir
     if not os.path.exists(output_dir):
         parser.error('TACO output directory %s not found' % output_dir)
@@ -83,18 +91,18 @@ def main():
 
     logging.info('bedGraphToBigWig: %s' % bedGraphToBigWig)
     logging.info('igvtools: %s' % igvtools)
+    logging.info('chrom_sizes_file: %s' % chrom_sizes_file)
     logging.info('output directory %s' % output_dir)
 
-    for strand, infile in chain(r.unresolved_bg_files, r.resolved_bg_files):
+    for strand, infile in enumerate(r.bedgraph_files):
         outfile = os.path.splitext(infile)[0] + '.bw'
         logging.info('Converting bedGraph to bigWig %s -> %s' %
                      (infile, outfile))
-        subprocess.call([bedGraphToBigWig, infile, r.chrom_sizes_file,
+        subprocess.call([bedGraphToBigWig, infile, chrom_sizes_file,
                          outfile])
 
     prepare_igvtools(igvtools, r.splice_graph_gtf_file, ext='gtf')
     prepare_igvtools(igvtools, r.assembly_gtf_file, ext='gtf')
-    prepare_igvtools(igvtools, r.assembly_loss_gtf_file, ext='gtf')
     prepare_igvtools(igvtools, r.splice_bed_file, ext='bed')
 
 
