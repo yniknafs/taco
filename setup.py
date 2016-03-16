@@ -66,7 +66,7 @@ def main():
           platforms='Linux',
           url='https://github.com/yniknafs/taco',
           ext_modules=extensions + cythonize(cython_extensions),
-          packages=['taco', 'taco.lib', 'taco.lib.bx'],
+          packages=['taco', 'taco.lib', 'taco.lib.bx', 'taco.lib.scipy'],
           scripts=['taco/taco_run.py'])
 
 
