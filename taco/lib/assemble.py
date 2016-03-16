@@ -501,7 +501,7 @@ def assemble_worker(state):
     # cleanup and close files
     state.close()
     # sort output files
-    logging.debug('\tsorting worker output files: "%s"' %
+    logging.debug('Sorting worker output files: "%s"' %
                   (state.results.output_dir))
     state.sort_output_files()
 
@@ -625,4 +625,5 @@ def assemble_parallel(args, results):
                       (path, excinfo))
     for r in worker_results:
         shutil.rmtree(r.output_dir, onerror=shutil_error_callback)
+    logging.info('Done')
     return 0
