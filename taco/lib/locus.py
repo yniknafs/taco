@@ -4,7 +4,6 @@ TACO: Transcriptome meta-assembly from RNA-Seq
 import logging
 import collections
 import numpy as np
-import h5py
 
 from base import Strand, TacoError
 from dtypes import FLOAT_DTYPE, H5_CHUNKSIZE
