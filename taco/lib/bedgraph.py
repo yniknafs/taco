@@ -34,6 +34,23 @@ def array_to_bedgraph(a, ref, start, fileh):
         fileh.write(FMT_STRING % (ref, start + i, start + a.shape[0], val))
 
 
+def array_to_bedgraph_iter(a, ref, start):
+    if a.shape[0] == 0:
+        return
+    i = 0
+    val = a[i]
+    for j in xrange(1, a.shape[0]):
+        newval = a[j]
+        if val != newval:
+            if val != 0:
+                yield ref, start + i, start + j, val
+            i = j
+            val = newval
+    if val != 0:
+        print 'HELLO'
+        yield ref, start + i, start + a.shape[0], val
+
+
 def bedgraph_to_array(fileh):
     intervals = collections.defaultdict(lambda: [])
     maxend = collections.defaultdict(lambda: 0)

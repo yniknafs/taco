@@ -301,8 +301,8 @@ class SpliceGraph(object):
                                  start=n.start + cp.start,
                                  end=n.start + cp.end)
                 changepts.append(cp)
-                logging.debug('(%s) changepoint node: %s-%s '
-                              'cp:%d(%d-%d) p=%.3f fc=%.3f' %
+                logging.debug('%s changepoint node=(%s-%s) '
+                              'pos=%d interval=(%d-%d) p=%.3f fc=%.3f' %
                               (genome_id_str, n.start,
                                n.end, cp.pos, cp.start, cp.end,
                                cp.pvalue, cp.foldchange))

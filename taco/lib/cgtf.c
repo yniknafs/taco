@@ -69,7 +69,7 @@ gtf_parse(gtf_t *gtfp, char *s, int copy_str) {
     gtfp->seqname = strsep(&linep, GTF_DELIM);
     gtfp->source = strsep(&linep, GTF_DELIM);
     gtfp->feature = strsep(&linep, GTF_DELIM);
-    gtfp->start = atoi(strsep(&linep, GTF_DELIM));
+    gtfp->start = atoi(strsep(&linep, GTF_DELIM)) - 1;
     gtfp->end = atoi(strsep(&linep, GTF_DELIM));
     gtfp->score = strsep(&linep, GTF_DELIM);
     gtfp->strand = strsep(&linep, GTF_DELIM);

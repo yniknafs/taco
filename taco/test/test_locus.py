@@ -36,9 +36,9 @@ def test_copy1d():
 def test_parse_loci():
     loci = read_gtf('parse_loci.gtf')
     assert len(loci) == 3
-    assert loci[0][0] == ('chrTest1', 10, 50)
-    assert loci[1][0] == ('chrTest1', 50, 200)
-    assert loci[2][0] == ('chrTest2', 100, 200)
+    assert loci[0][0] == ('chr1', 10, 50)
+    assert loci[1][0] == ('chr1', 50, 200)
+    assert loci[2][0] == ('chr2', 100, 200)
 
 
 def test_create_locus():

@@ -212,17 +212,17 @@ def assemble_isoforms(sgraph, config):
     genome_id_str = ('%s:%d-%d[%s]' %
                      (sgraph.chrom, sgraph.start, sgraph.end,
                       Strand.to_gtf(sgraph.strand)))
-    logging.debug('(%s) finding isoforms in k=%d graph (%d kmers) '
+    logging.debug('%s finding isoforms in k=%d graph (%d kmers) '
                   'source_expr=%f' %
                   (genome_id_str, k, len(K), K.exprs[K.SOURCE_ID]))
     paths = []
     for kmer_path, expr in find_paths(K, config.path_frac, config.max_paths):
         path = reconstruct_path(kmer_path, K, sgraph)
         paths.append((path, expr))
-    logging.debug('(%s) isoforms: %d' % (genome_id_str, len(paths)))
+    logging.debug('%s isoforms: %d' % (genome_id_str, len(paths)))
     # build gene clusters
     clusters, filtered = Cluster.build(paths, min_frac=config.isoform_frac)
-    logging.debug('(%s) gene clusters: %d filtered transfrags: %d' %
+    logging.debug('%s gene clusters: %d filtered transfrags: %d' %
                   (genome_id_str, len(clusters), len(filtered)))
     gene_isoforms = []
     for cluster in clusters:
@@ -241,7 +241,7 @@ def assemble_gene(sgraph, locus_id_str, config):
     genome_id_str = ('%s:%d-%d[%s]' %
                      (sgraph.chrom, sgraph.start, sgraph.end,
                       Strand.to_gtf(sgraph.strand)))
-    logging.debug('(%s) locus: %s nodes: %d' %
+    logging.debug('%s locus: %s nodes: %d' %
                   (genome_id_str, locus_id_str, len(sgraph.G)))
     # output splice graph node data
     for f in sgraph.get_node_gtf():
@@ -252,7 +252,7 @@ def assemble_gene(sgraph, locus_id_str, config):
         changepts = sgraph.detect_change_points(
             pval=config.change_point_pvalue,
             fc_cutoff=config.change_point_fold_change)
-        logging.debug('(%s) locus %s change points: %d' %
+        logging.debug('%s locus %s change points: %d' %
                       (genome_id_str, locus_id_str, len(changepts)))
         for cp in changepts:
             sgraph.apply_change_point(cp, config.change_point_trim)
@@ -302,7 +302,7 @@ def assemble_locus(locus_id, transfrags, config):
                          config.guided_ends,
                          config.guided_assembly)
     genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
-    logging.debug('(%s) locus: %s transfrags: %d (+: %d, -: %d, .: %d)' %
+    logging.debug('%s locus: %s transfrags: %d (+: %d, -: %d, .: %d)' %
                   (genome_id_str, locus_id, len(transfrags),
                    len(locus.get_transfrags(Strand.POS)),
                    len(locus.get_transfrags(Strand.NEG)),
@@ -310,7 +310,7 @@ def assemble_locus(locus_id, transfrags, config):
     # resolve unstranded transcripts
     num_resolved = locus.impute_unknown_strands()
     if num_resolved > 0:
-        logging.debug('(%s) locus: %s resolved: %d (+: %d, -: %d, .: %d)' %
+        logging.debug('%s locus: %s resolved: %d (+: %d, -: %d, .: %d)' %
                       (genome_id_str, locus_id, num_resolved,
                        len(locus.get_transfrags(Strand.POS)),
                        len(locus.get_transfrags(Strand.NEG)),
@@ -325,7 +325,7 @@ def assemble_locus(locus_id, transfrags, config):
 
 
 def parse_gtf_locus(locus, gtf_fileh):
-    logging.debug('[%s:%d-%d] locus: %s features: %d' %
+    logging.debug('%s:%d-%d locus: %s features: %d' %
                   (locus.chrom, locus.start, locus.end, locus.name,
                    locus.num_lines))
     # fast-forward to 'filepos'

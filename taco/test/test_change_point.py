@@ -11,7 +11,7 @@ from taco.lib.dtypes import FLOAT_DTYPE
 from taco.lib.splice_graph import SpliceGraph
 from taco.lib.cchangepoint import mse as mse_cython
 from taco.lib.changepoint import mse as mse_python, smooth, run_changepoint
-from taco.lib.assemble import assemble_isoforms, Config
+from taco.lib.assemble import assemble_isoforms
 from taco.lib.transfrag import Transfrag
 
 from taco.test.base import read_single_locus

@@ -150,13 +150,13 @@ class PathGraphFactory(object):
             return len(K)
 
         k, num_kmers = maximize_bisect(compute_kmers, 1, kmax, 0)
-        logging.debug('(%s) creating path graph k=%d num_kmers=%d' %
+        logging.debug('%s creating path graph k=%d num_kmers=%d' %
                       (id_str, k, num_kmers))
         K = self.create(k)
-        logging.debug('(%s) rescuing short transfrags kmers=%d' %
+        logging.debug('%s rescuing short transfrags kmers=%d' %
                       (id_str, len(K)))
         num_lost = self.rescue_short_transfrags(K, K.short_transfrags)
-        logging.debug('(%s) lost %d of %d short transfrags' %
+        logging.debug('%s lost %d of %d short transfrags' %
                       (id_str, num_lost, len(K.short_transfrags)))
         return K, k
 
