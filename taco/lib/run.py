@@ -35,7 +35,8 @@ class Args:
     GUIDED_STRAND = False
     GUIDED_ENDS = False
     GTF_EXPR_ATTR = 'TPM'
-    MIN_FRAG_LENGTH = 200
+    MIN_TRANSFRAG_LENGTH = 200
+    MIN_EXPR = 0.1
     ISOFORM_FRAC = 0.0
     MAX_ISOFORMS = 0
     CHANGE_POINT = True
@@ -99,11 +100,19 @@ class Args:
                             metavar='ATTR',
                             help='GTF attribute field containing '
                             'expression [default=%(default)s]')
-        parser.add_argument('--min-frag-length', dest='min_frag_length',
+        parser.add_argument('--min-transfrag-length',
+                            dest='min_transfrag_length',
                             type=int, metavar='N',
-                            default=Args.MIN_FRAG_LENGTH,
-                            help='Length (bp) of smallest valid fragment '
-                            'across all experiments [default=%(default)s]')
+                            default=Args.MIN_TRANSFRAG_LENGTH,
+                            help='Filter input transfrags with length < N '
+                            'prior to assembly [default=%(default)s]')
+        parser.add_argument('--min-expr',
+                            dest='min_expr',
+                            type=float, metavar='X',
+                            default=Args.MIN_EXPR,
+                            help='Filter input transfrags with expression '
+                            '(gtf-expr-attr parameter) < X prior to assembly '
+                            '[default=%(default)s]')
         parser.add_argument('--isoform-frac',
                             dest='isoform_frac', type=float, metavar='X',
                             default=Args.ISOFORM_FRAC,
@@ -201,6 +210,8 @@ class Args:
         func(fmt.format('verbose logging:', str(args.verbose)))
         func(fmt.format('num processes:', str(args.num_processes)))
         func(fmt.format('output directory:', str(args.output_dir)))
+        func(fmt.format('min transfrag length:', args.min_transfrag_length))
+        func(fmt.format('min expression:', args.min_expr))
         func(fmt.format('reference GTF file:', str(args.ref_gtf_file)))
         func(fmt.format('guided assembly mode:', str(args.guided_assembly)))
         func(fmt.format('guided strand mode:', str(args.guided_strand)))
@@ -213,7 +224,6 @@ class Args:
         func(fmt.format('change point fold change:',
                         str(args.change_point_fold_change)))
         func(fmt.format('change point trim:', str(args.change_point_trim)))
-        func(fmt.format('min fragment length:', args.min_frag_length))
         func(fmt.format('path graph loss threshold:',
                         args.path_graph_loss_threshold))
         func(fmt.format('path frac:', args.path_frac))
@@ -247,8 +257,10 @@ class Args:
                 parser.error("sample file %s not found" % (args.sample_file))
             args.sample_file = os.path.abspath(args.sample_file)
 
-            if args.min_frag_length < 0:
-                parser.error("min_frag_length < 0")
+            if args.min_transfrag_length < 0:
+                parser.error("min_transfrag_length < 0")
+            if args.min_expr < 0:
+                parser.error("min_expr < 0")
             if (args.isoform_frac < 0) or (args.isoform_frac > 1):
                 parser.error("isoform_frac out of range (0.0-1.0)")
             if (args.max_isoforms < 0):

@@ -296,7 +296,33 @@ def assemble_gene(sgraph, locus_id_str, config):
             print >>config.assembly_bed_fh, '\t'.join(fields)
 
 
-def assemble_locus(locus_id, transfrags, config):
+def filter_transfrags(transfrags, min_length, min_expr, filtered_gtf_fh):
+    new_transfrags = []
+    for t in transfrags:
+        if ((t.length < min_length) or (t.expr < min_expr)):
+            for f in t.to_gtf():
+                print >>filtered_gtf_fh, str(f)
+        else:
+            new_transfrags.append(t)
+    return new_transfrags
+
+
+def assemble_locus(locus, transfrags, config):
+    # filter transfrags by expression and transfrag length
+    genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
+    locus_id = locus.name
+    num_transfrags = len(transfrags)
+    transfrags = filter_transfrags(transfrags,
+                                   config.min_transfrag_length,
+                                   config.min_expr,
+                                   config.transfrags_filtered_gtf_fh)
+    num_filtered_transfrags = len(transfrags)
+    logging.debug('%s locus: %s transfrags: %d filtered: %d' %
+                  (genome_id_str, locus.name, num_transfrags,
+                   num_filtered_transfrags))
+    if len(transfrags) == 0:
+        return
+    # create locus
     locus = Locus.create(transfrags,
                          config.guided_strand,
                          config.guided_ends,
@@ -325,9 +351,9 @@ def assemble_locus(locus_id, transfrags, config):
 
 
 def parse_gtf_locus(locus, gtf_fileh):
-    logging.debug('%s:%d-%d locus: %s features: %d' %
-                  (locus.chrom, locus.start, locus.end, locus.name,
-                   locus.num_lines))
+    genome_id_str = '%s:%d-%d' % (locus.chrom, locus.start, locus.end)
+    logging.debug('%s locus: %s features: %d' %
+                  (genome_id_str, locus.name, locus.num_lines))
     # fast-forward to 'filepos'
     gtf_fileh.seek(locus.filepos)
     # read 'num_lines' lines from file and parse into transfrag objects
@@ -401,6 +427,8 @@ class WorkerState(object):
         self.path_graph_stats_fh = open(r.path_graph_stats_file, 'w')
         self.assembly_gtf_fh = open(r.assembly_gtf_file, 'w')
         self.assembly_bed_fh = open(r.assembly_bed_file, 'w')
+        self.transfrags_filtered_gtf_fh = \
+            open(r.transfrags_filtered_gtf_file, 'w')
 
     def close(self):
         # close files
@@ -411,6 +439,7 @@ class WorkerState(object):
         self.path_graph_stats_fh.close()
         self.assembly_gtf_fh.close()
         self.assembly_bed_fh.close()
+        self.transfrags_filtered_gtf_fh.close()
 
     def sort_output_files(self):
         # create output directories
@@ -427,6 +456,15 @@ class WorkerState(object):
         # create new set of sorted results
         sorted_results = Results(sort_output_dir)
 
+        # filtered gtf file
+        logging.debug('\t%s filtered gtf file' % (results.output_dir))
+        batch_sort(input=results.transfrags_filtered_gtf_file,
+                   output=sorted_results.transfrags_filtered_gtf_file,
+                   key=sort_key_gtf,
+                   buffer_size=SORT_BUFFER_SIZE,
+                   tempdirs=[sort_tmp_dir])
+        os.rename(sorted_results.transfrags_filtered_gtf_file,
+                  results.transfrags_filtered_gtf_file)
         # bedgraph files
         logging.debug('\t%s bedgraph files' % (results.output_dir))
         for filename, sorted_filename in zip(results.bedgraph_files,
@@ -495,7 +533,7 @@ def assemble_worker(state):
         if locus is None:
             break
         transfrags = parse_gtf_locus(locus, gtf_fileh)
-        assemble_locus(locus.name, transfrags, state)
+        assemble_locus(locus, transfrags, state)
         state.input_queue.task_done()
     state.input_queue.task_done()
     # cleanup and close files
@@ -587,6 +625,10 @@ def assemble_parallel(args, results):
             fh.close()
 
     logging.info('Merging output files')
+    logging.debug('\tmerging filtered gtf files')
+    merge(input_files=[r.transfrags_filtered_gtf_file for r in worker_results],
+          output_file=results.transfrags_filtered_gtf_file,
+          key=sort_key_gtf)
     logging.debug('\tmerging bedgraph files')
     for i, output_file in enumerate(results.bedgraph_files):
         input_files = [r.bedgraph_files[i] for r in worker_results]

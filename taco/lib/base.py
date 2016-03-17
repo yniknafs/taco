@@ -111,7 +111,7 @@ class Results(object):
     ARGS_FILE = 'args.pickle'
     SAMPLE_FILE = 'samples.txt'
     TRANSFRAGS_GTF_FILE = 'transfrags.gtf'
-    TRANSFRAGS_FAIL_GTF_FILE = 'transfrags.fail.gtf'
+    TRANSFRAGS_FILTERED_GTF_FILE = 'transfrags.filtered.gtf'
     AGGREGATE_STATS_FILE = 'aggregate_stats.txt'
     LOCUS_INDEX_FILE = 'loci.txt'
     SPLICE_GRAPH_GTF_FILE = 'splice_graph.gtf'
@@ -134,8 +134,8 @@ class Results(object):
             os.path.join(output_dir, Results.LOCUS_INDEX_FILE)
         self.transfrags_gtf_file = \
             os.path.join(output_dir, Results.TRANSFRAGS_GTF_FILE)
-        self.transfrags_fail_gtf_file = \
-            os.path.join(output_dir, Results.TRANSFRAGS_FAIL_GTF_FILE)
+        self.transfrags_filtered_gtf_file = \
+            os.path.join(output_dir, Results.TRANSFRAGS_FILTERED_GTF_FILE)
         self.splice_graph_gtf_file = \
             os.path.join(output_dir, Results.SPLICE_GRAPH_GTF_FILE)
         self.bedgraph_files = [os.path.join(output_dir, x)
