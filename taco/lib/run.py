@@ -50,7 +50,7 @@ class Args:
     RESUME = False
     OUTPUT_DIR = 'taco'
     PROG = 'taco'
-    DESCRIPTION = 'Meta-assembly of RNA-Seq datasets'
+    DESCRIPTION = 'TACO: Meta-assembly of RNA-Seq datasets'
 
     @staticmethod
     def create():
